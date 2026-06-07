@@ -1,0 +1,443 @@
+"""
+core/pdf_report.py
+------------------
+Generates a professional PDF calibration report using ReportLab.
+
+Install:  pip install reportlab
+
+Usage
+-----
+    from core.pdf_report import PdfReport
+    from core import CalibrationEngine
+
+    report = CalibrationEngine.compare(origin, dut)
+    PdfReport.generate(report, "output/calibration_report.pdf",
+                       operator="Ahmed", session_id=42)
+"""
+
+from pathlib import Path
+from datetime import datetime
+from typing import Optional
+
+# ── ReportLab imports ─────────────────────────────────────────────────────────
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib import colors
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        HRFlowable, KeepTogether,
+    )
+    from reportlab.platypus.flowables import HRFlowable
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
+
+# ── Colour palette (matches the dark UI theme — but for print/light paper) ────
+C_DARK      = colors.HexColor("#0D1117")
+C_ACCENT    = colors.HexColor("#E8A020")   # amber
+C_PASS      = colors.HexColor("#2ECC71")   # green
+C_FAIL      = colors.HexColor("#E74C3C")   # red
+C_WARN      = colors.HexColor("#E8A020")   # amber
+C_5G        = colors.HexColor("#3B8FD4")   # blue
+C_2G        = colors.HexColor("#27AE60")   # green
+C_6G        = colors.HexColor("#E67E22")   # orange
+C_HEADER_BG = colors.HexColor("#1C2030")
+C_ROW_ALT   = colors.HexColor("#F4F6FA")
+C_BORDER    = colors.HexColor("#C8CDD8")
+C_WHITE     = colors.white
+C_BLACK     = colors.black
+C_GRAY      = colors.HexColor("#6C7A8A")
+
+
+class PdfReport:
+
+    @staticmethod
+    def generate(
+        report,
+        output_path: str,
+        operator: str = "",
+        session_id: Optional[int] = None,
+    ) -> str:
+        """
+        Generate a PDF report from a CalibrationReport.
+
+        Parameters
+        ----------
+        report      : CalibrationReport
+        output_path : where to write the .pdf file
+        operator    : name of the logged-in user
+        session_id  : DB session ID (shown in header)
+
+        Returns
+        -------
+        str : absolute path to the written file
+        """
+        if not REPORTLAB_AVAILABLE:
+            raise ImportError(
+                "ReportLab is required for PDF export.\n"
+                "Install it with:  pip install reportlab"
+            )
+
+        output_path = str(output_path)
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+        doc = SimpleDocTemplate(
+            output_path,
+            pagesize=A4,
+            leftMargin=18*mm, rightMargin=18*mm,
+            topMargin=18*mm,  bottomMargin=18*mm,
+        )
+
+        styles = _make_styles()
+        story  = []
+
+        # ── Cover header ──────────────────────────────────────────────────────
+        story += _build_header(report, operator, session_id, styles)
+        story.append(Spacer(1, 6*mm))
+
+        # ── Overall result banner ──────────────────────────────────────────────
+        story += _build_result_banner(report, styles)
+        story.append(Spacer(1, 4*mm))
+
+        # ── Summary metric table ───────────────────────────────────────────────
+        story += _build_summary_table(report, styles)
+        story.append(Spacer(1, 6*mm))
+
+        # ── TX Calibration results ─────────────────────────────────────────────
+        story.append(Paragraph("TX Calibration Results", styles["section"]))
+        story.append(Spacer(1, 2*mm))
+        story += _build_tx_table(report, styles)
+        story.append(Spacer(1, 6*mm))
+
+        # ── RX Comparison results ──────────────────────────────────────────────
+        story.append(Paragraph("RX Comparison Results", styles["section"]))
+        story.append(Spacer(1, 2*mm))
+        story += _build_rx_table(report, styles)
+        story.append(Spacer(1, 6*mm))
+
+        # ── Corrections needed ────────────────────────────────────────────────
+        from core.calibration import CalibrationEngine
+        corrections = CalibrationEngine.get_corrections(report)
+        if corrections:
+            story.append(Paragraph("EEPROM Corrections Required", styles["section_warn"]))
+            story.append(Spacer(1, 2*mm))
+            story += _build_corrections_table(corrections, styles)
+        else:
+            story.append(Paragraph(
+                "No EEPROM corrections required at the configured tolerance.",
+                styles["pass_text"]
+            ))
+
+        # ── Footer note ────────────────────────────────────────────────────────
+        story.append(Spacer(1, 8*mm))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=C_BORDER))
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph(
+            f"Generated by WiFi Calibration Tool — Sagemcom / EDERSON  |  "
+            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  |  "
+            f"Operator: {operator or 'N/A'}",
+            styles["footer"]
+        ))
+
+        doc.build(story)
+        return output_path
+
+
+# ── Style definitions ─────────────────────────────────────────────────────────
+
+def _make_styles() -> dict:
+    base = getSampleStyleSheet()
+
+    def ps(name, **kw):
+        return ParagraphStyle(name, **kw)
+
+    return {
+        "title": ps("title",
+            fontSize=18, fontName="Helvetica-Bold",
+            textColor=C_DARK, spaceAfter=4),
+        "subtitle": ps("subtitle",
+            fontSize=10, fontName="Helvetica",
+            textColor=C_GRAY, spaceAfter=2),
+        "section": ps("section",
+            fontSize=11, fontName="Helvetica-Bold",
+            textColor=C_DARK,
+            borderPad=4, borderWidth=0,
+            borderColor=C_ACCENT,
+            leftIndent=0, spaceAfter=2,
+        ),
+        "section_warn": ps("section_warn",
+            fontSize=11, fontName="Helvetica-Bold",
+            textColor=C_WARN, spaceAfter=2),
+        "body": ps("body",
+            fontSize=9, fontName="Helvetica",
+            textColor=C_DARK, leading=13),
+        "mono": ps("mono",
+            fontSize=8, fontName="Courier",
+            textColor=C_DARK),
+        "pass_text": ps("pass_text",
+            fontSize=9, fontName="Helvetica-Bold",
+            textColor=C_PASS),
+        "fail_text": ps("fail_text",
+            fontSize=9, fontName="Helvetica-Bold",
+            textColor=C_FAIL),
+        "footer": ps("footer",
+            fontSize=7, fontName="Helvetica",
+            textColor=C_GRAY, alignment=TA_CENTER),
+    }
+
+
+# ── Section builders ──────────────────────────────────────────────────────────
+
+def _build_header(report, operator, session_id, styles) -> list:
+    now = datetime.now().strftime("%Y-%m-%d  %H:%M")
+    sid = f"Session #{session_id}" if session_id else ""
+
+    header_data = [[
+        Paragraph("WiFi Calibration Report", styles["title"]),
+        Paragraph(
+            f"<b>Product:</b> {report.product_name}<br/>"
+            f"<b>DUT serial:</b> {report.dut_serial}<br/>"
+            f"<b>Origin serial:</b> {report.origin_serial}<br/>"
+            f"<b>Operator:</b> {operator or '—'}  &nbsp;&nbsp; "
+            f"<b>Date:</b> {now}  &nbsp;&nbsp; {sid}",
+            styles["body"]
+        ),
+    ]]
+    t = Table(header_data, colWidths=["45%", "55%"])
+    t.setStyle(TableStyle([
+        ("VALIGN",     (0,0), (-1,-1), "TOP"),
+        ("LINEBELOW",  (0,0), (-1,0),  0.5, C_ACCENT),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+    ]))
+    return [t]
+
+
+def _build_result_banner(report, styles) -> list:
+    if report.overall_pass:
+        text  = "OVERALL RESULT:  PASS  — No corrections required"
+        bg    = colors.HexColor("#0D2A1A")
+        fg    = C_PASS
+    else:
+        text  = "OVERALL RESULT:  FAIL / CORRECTION NEEDED"
+        bg    = colors.HexColor("#2A0D0D")
+        fg    = C_FAIL
+
+    style = ParagraphStyle("banner",
+        fontSize=12, fontName="Helvetica-Bold",
+        textColor=fg, alignment=TA_CENTER)
+
+    t = Table([[Paragraph(text, style)]],
+              colWidths=["100%"])
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), bg),
+        ("TOPPADDING",    (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("LEFTPADDING",   (0,0), (-1,-1), 12),
+    ]))
+    return [t]
+
+
+def _build_summary_table(report, styles) -> list:
+    hdr_style = ParagraphStyle("sh",
+        fontSize=8, fontName="Helvetica-Bold",
+        textColor=C_WHITE, alignment=TA_CENTER)
+    val_style = ParagraphStyle("sv",
+        fontSize=11, fontName="Courier-Bold",
+        textColor=C_DARK, alignment=TA_CENTER)
+    lbl_style = ParagraphStyle("sl",
+        fontSize=7, fontName="Helvetica",
+        textColor=C_GRAY, alignment=TA_CENTER)
+
+    def cell(label, value, val_color=C_DARK):
+        vs = ParagraphStyle("_v", fontSize=11, fontName="Courier-Bold",
+                            textColor=val_color, alignment=TA_CENTER)
+        return [
+            Paragraph(label, lbl_style),
+            Paragraph(str(value), vs),
+        ]
+
+    avg = f"{report.tx_avg_delta:+.3f}" if report.tx_avg_delta is not None else "—"
+    mx  = f"{report.tx_max_delta:.3f}"  if report.tx_max_delta  is not None else "—"
+
+    data = [[
+        cell("TX BLOCKS",     len(report.tx_results)),
+        cell("TX PASS",       report.tx_pass_count,      C_PASS),
+        cell("TX FAIL",       report.tx_fail_count,      C_FAIL if report.tx_fail_count else C_DARK),
+        cell("CORRECTIONS",   report.tx_needs_correction_count,
+             C_WARN if report.tx_needs_correction_count else C_DARK),
+        cell("RX PASS",       report.rx_pass_count,      C_PASS),
+        cell("RX FAIL",       report.rx_fail_count,      C_FAIL if report.rx_fail_count else C_DARK),
+        cell("AVG Δ",         avg),
+        cell("MAX |Δ|",       mx),
+    ]]
+
+    t = Table(data, colWidths=[f"{100/8:.1f}%"] * 8)
+    t.setStyle(TableStyle([
+        ("BOX",           (0,0), (-1,-1), 0.5, C_BORDER),
+        ("INNERGRID",     (0,0), (-1,-1), 0.3, C_BORDER),
+        ("BACKGROUND",    (0,0), (-1,-1), C_ROW_ALT),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING",    (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+    ]))
+    return [t]
+
+
+def _build_tx_table(report, styles) -> list:
+    col_hdr = ["Band", "Blk", "Freq", "Mod", "BW", "Ant",
+               "Origin dBm", "DUT dBm", "Delta", "Correction", "Limits", "Status"]
+
+    hdr_style = ParagraphStyle("_th", fontSize=7, fontName="Helvetica-Bold",
+                               textColor=C_WHITE, alignment=TA_CENTER)
+    row_style = ParagraphStyle("_td", fontSize=7, fontName="Courier",
+                               textColor=C_DARK, alignment=TA_CENTER)
+
+    rows = [[Paragraph(h, hdr_style) for h in col_hdr]]
+
+    band_colors = {"5 GHz": C_5G, "2.4 GHz": C_2G, "6 GHz": C_6G}
+
+    for r in report.tx_results:
+        band_val = r.band.value if r.band else "?"
+        bc = band_colors.get(band_val, C_GRAY)
+        band_style = ParagraphStyle("_b", fontSize=7, fontName="Helvetica-Bold",
+                                    textColor=bc, alignment=TA_CENTER)
+        orig = f"{r.origin_measured_dbm:.2f}" if r.origin_measured_dbm is not None else "—"
+        dut  = f"{r.dut_measured_dbm:.2f}"    if r.dut_measured_dbm  is not None else "—"
+        dlt  = (f"{r.delta_dbm:+.3f}" if r.delta_dbm is not None else "—")
+        cor  = (f"{r.correction_dbm:+.3f}" if r.correction_dbm is not None else "—")
+        lim  = r.limits_str
+
+        s = r.status.value
+        if "PASS" in s or s == "OK":
+            sc = C_PASS
+        elif "FAIL" in s:
+            sc = C_FAIL
+        elif "CORR" in s:
+            sc = C_WARN
+        else:
+            sc = C_GRAY
+        sstyle = ParagraphStyle("_s", fontSize=7, fontName="Helvetica-Bold",
+                                textColor=sc, alignment=TA_CENTER)
+
+        rows.append([
+            Paragraph(band_val, band_style),
+            Paragraph(str(r.block_number), row_style),
+            Paragraph(str(r.freq_mhz), row_style),
+            Paragraph(r.modulation, row_style),
+            Paragraph(r.bandwidth, row_style),
+            Paragraph(r.antenna, row_style),
+            Paragraph(orig, row_style),
+            Paragraph(dut, row_style),
+            Paragraph(dlt, row_style),
+            Paragraph(cor, row_style),
+            Paragraph(lim, row_style),
+            Paragraph(s, sstyle),
+        ])
+
+    cw = [30, 18, 34, 34, 28, 22, 38, 38, 36, 40, 46, 50]
+    t = Table(rows, colWidths=[c*mm for c in cw], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,0),  C_HEADER_BG),
+        ("ROWBACKGROUNDS",(0,1), (-1,-1), [C_WHITE, C_ROW_ALT]),
+        ("BOX",           (0,0), (-1,-1), 0.5, C_BORDER),
+        ("INNERGRID",     (0,0), (-1,-1), 0.3, C_BORDER),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+    ]))
+    return [t]
+
+
+def _build_rx_table(report, styles) -> list:
+    col_hdr = ["Band", "Blk", "Freq", "MCS", "BW", "Ant",
+               "Orig RSSI", "DUT RSSI", "Δ RSSI", "PER %", "Status"]
+    hdr_style = ParagraphStyle("_rth", fontSize=7, fontName="Helvetica-Bold",
+                               textColor=C_WHITE, alignment=TA_CENTER)
+    row_style = ParagraphStyle("_rtd", fontSize=7, fontName="Courier",
+                               textColor=C_DARK, alignment=TA_CENTER)
+    band_colors = {"5 GHz": C_5G, "2.4 GHz": C_2G, "6 GHz": C_6G}
+
+    rows = [[Paragraph(h, hdr_style) for h in col_hdr]]
+    for r in report.rx_results:
+        band_val = r.band.value if r.band else "?"
+        bc = band_colors.get(band_val, C_GRAY)
+        bst = ParagraphStyle("_rb", fontSize=7, fontName="Helvetica-Bold",
+                             textColor=bc, alignment=TA_CENTER)
+        orig_rssi = f"{r.origin_rssi:.1f}" if r.origin_rssi and r.origin_rssi != -999 else "N/A"
+        dut_rssi  = f"{r.dut_rssi:.1f}"   if r.dut_rssi  and r.dut_rssi  != -999 else "N/A"
+        delta_r   = f"{r.rssi_delta:+.1f}" if r.rssi_delta is not None else "—"
+        per       = f"{r.dut_per:.2f}"     if r.dut_per  is not None else "—"
+
+        s = r.status.value
+        sc = C_PASS if "PASS" in s else (C_FAIL if "FAIL" in s else C_GRAY)
+        sst = ParagraphStyle("_rs", fontSize=7, fontName="Helvetica-Bold",
+                             textColor=sc, alignment=TA_CENTER)
+        rows.append([
+            Paragraph(band_val, bst),
+            Paragraph(str(r.block_number), row_style),
+            Paragraph(str(r.freq_mhz), row_style),
+            Paragraph(r.mcs, row_style),
+            Paragraph(r.bandwidth, row_style),
+            Paragraph(r.antenna_label, row_style),
+            Paragraph(orig_rssi, row_style),
+            Paragraph(dut_rssi, row_style),
+            Paragraph(delta_r, row_style),
+            Paragraph(per, row_style),
+            Paragraph(s, sst),
+        ])
+
+    cw = [30, 18, 34, 28, 28, 30, 40, 40, 36, 30, 50]
+    t = Table(rows, colWidths=[c*mm for c in cw], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,0),  C_HEADER_BG),
+        ("ROWBACKGROUNDS",(0,1), (-1,-1), [C_WHITE, C_ROW_ALT]),
+        ("BOX",           (0,0), (-1,-1), 0.5, C_BORDER),
+        ("INNERGRID",     (0,0), (-1,-1), 0.3, C_BORDER),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+    ]))
+    return [t]
+
+
+def _build_corrections_table(corrections: list, styles) -> list:
+    col_hdr = ["Band", "Block", "Freq", "Mod", "BW", "Ant",
+               "Origin dBm", "DUT dBm", "Delta", "Correction to apply"]
+    hdr_style = ParagraphStyle("_cth", fontSize=7, fontName="Helvetica-Bold",
+                               textColor=C_WHITE, alignment=TA_CENTER)
+    row_style = ParagraphStyle("_ctd", fontSize=7, fontName="Courier",
+                               textColor=C_DARK, alignment=TA_CENTER)
+    cor_style = ParagraphStyle("_cco", fontSize=7, fontName="Courier-Bold",
+                               textColor=C_WARN, alignment=TA_CENTER)
+
+    rows = [[Paragraph(h, hdr_style) for h in col_hdr]]
+    for c in corrections:
+        rows.append([
+            Paragraph(c.get("band",""), row_style),
+            Paragraph(str(c.get("label","")).split(".")[0], row_style),
+            Paragraph(str(c.get("freq_mhz","")), row_style),
+            Paragraph(c.get("modulation",""), row_style),
+            Paragraph(c.get("bandwidth",""), row_style),
+            Paragraph(c.get("antenna",""), row_style),
+            Paragraph(f"{c.get('origin_measured_dbm',0):.2f}", row_style),
+            Paragraph(f"{c.get('dut_measured_dbm',0):.2f}", row_style),
+            Paragraph(f"{c.get('delta_dbm',0):+.3f}", row_style),
+            Paragraph(f"{c.get('correction_dbm',0):+.3f}", cor_style),
+        ])
+
+    cw = [28, 20, 30, 32, 26, 22, 38, 38, 36, 50]
+    t = Table(rows, colWidths=[c*mm for c in cw], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,0),  C_HEADER_BG),
+        ("ROWBACKGROUNDS",(0,1), (-1,-1), [colors.HexColor("#FFF8EC"), colors.HexColor("#FFF3D6")]),
+        ("BOX",           (0,0), (-1,-1), 0.8, C_WARN),
+        ("INNERGRID",     (0,0), (-1,-1), 0.3, C_BORDER),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+    ]))
+    return [t]

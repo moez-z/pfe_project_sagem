@@ -1,0 +1,113 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Post {
+  id         Int       @id @default(autoincrement())
+  number     Int       @unique
+  name       String    @db.VarChar(32)
+  ip_address String?   @db.VarChar(45)
+  is_active  Boolean   @default(true)
+  created_at DateTime? @default(now())
+
+  sessions CalibrationSession[]
+
+  @@map("posts")
+}
+
+model CalibrationSession {
+  id              Int       @id @default(autoincrement())
+  user_id         Int?
+  post_id         Int?
+  dut_serial      String?   @db.VarChar(64)
+  origin_serial   String?   @db.VarChar(64)
+  product_name    String?   @db.VarChar(64)
+  dut_filename    String?   @db.VarChar(256)
+  origin_filename String?   @db.VarChar(256)
+  tolerance_dbm   Float?
+  overall_pass    Boolean?
+  tx_total        Int?
+  tx_pass         Int?
+  tx_fail         Int?
+  tx_corrections  Int?
+  rx_total        Int?
+  rx_pass         Int?
+  rx_fail         Int?
+  avg_delta_dbm   Float?
+  max_delta_dbm   Float?
+  created_at      DateTime? @db.Timestamp(6)
+  notes           String?
+
+  user       User?      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  post       Post?      @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rx_results RxResult[]
+  tx_results TxResult[]
+
+  @@index([created_at], map: "ix_calibration_sessions_created_at")
+  @@map("calibration_sessions")
+}
+
+model RxResult {
+  id            Int     @id @default(autoincrement())
+  session_id    Int
+  band          String? @db.VarChar(16)
+  block_number  Int?
+  freq_mhz      Int?
+  mcs           String? @db.VarChar(16)
+  bandwidth     String? @db.VarChar(16)
+  antenna_label String? @db.VarChar(32)
+  origin_rssi   Float?
+  dut_rssi      Float?
+  rssi_delta    Float?
+  origin_per    Float?
+  dut_per       Float?
+  status        String? @db.VarChar(32)
+
+  session CalibrationSession @relation(fields: [session_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([session_id], map: "ix_rx_results_session_id")
+  @@map("rx_results")
+}
+
+model TxResult {
+  id             Int     @id @default(autoincrement())
+  session_id     Int
+  band           String? @db.VarChar(16)
+  block_number   Int?
+  freq_mhz       Int?
+  modulation     String? @db.VarChar(32)
+  bandwidth      String? @db.VarChar(16)
+  antenna        String? @db.VarChar(8)
+  origin_dbm     Float?
+  dut_dbm        Float?
+  delta_dbm      Float?
+  correction_dbm Float?
+  tx_target_dbm  Float?
+  limit_lo       Float?
+  limit_hi       Float?
+  status         String? @db.VarChar(32)
+
+  session CalibrationSession @relation(fields: [session_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([session_id], map: "ix_tx_results_session_id")
+  @@map("tx_results")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  matricule     String    @unique(map: "ix_users_matricule") @db.VarChar(64)
+  password_hash String    
+  full_name     String?   @db.VarChar(128)
+  role          String?   @db.VarChar(32)
+  created_at    DateTime? @db.Timestamp(6)
+  last_login    DateTime? @db.Timestamp(6)
+
+  sessions CalibrationSession[]
+
+  @@map("users")
+}

@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:15
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ./web_dashborad/calibration-dashboard
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://postgres:okokok@db:5432/wifi_calibration
+      AUTH_TRUST_HOST: "true"
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: c44996cf9634bad20489b58d275e09b07d393d982126fd491bca989041a43e20
+      AUTH_SESSION_MAX_AGE: "7200"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs/cert.pem:/etc/nginx/certs/cert.pem:ro
+      - ./nginx/certs/key.pem:/etc/nginx/certs/key.pem:ro
+    depends_on:
+      - web
+
+volumes:
+  pgdata:
