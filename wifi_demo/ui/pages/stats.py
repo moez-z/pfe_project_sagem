@@ -19,7 +19,7 @@ from ui import styles
 class StatsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._db = None
+        self._api_url = None
         self._build_ui()
     # ── Build ─────────────────────────────────────────────────────────────────
     def _build_ui(self):
@@ -77,15 +77,22 @@ class StatsPage(QWidget):
         self._bar_chart_view.setMinimumHeight(180)
         root.addWidget(self._bar_chart_view)
     # ── Public API ─────────────────────────────────────────────────────────────
+    # ── Public API ─────────────────────────────────────────────────────────────
+
+    def set_api_url(self, api_url: str):
+        self._api_url = api_url
+
+    # keep backward compat
     def set_db(self, db):
-        self._db = db
+        pass
+
     def refresh(self):
-        if self._db is None:
+        if not hasattr(self, "_api_url") or not self._api_url:
             return
         try:
-            from db.repository import SessionRepo
-            stats   = SessionRepo.stats_summary(self._db)
-            deltas  = SessionRepo.recent_deltas(self._db, limit=30)
+            import requests
+            stats  = requests.get(f"{self._api_url}/stats/summary", timeout=10).json()
+            deltas = requests.get(f"{self._api_url}/stats/deltas?limit=30", timeout=10).json()
             self._update_kpis(stats)
             self._update_trend_chart(deltas)
             self._update_bar_chart(deltas)

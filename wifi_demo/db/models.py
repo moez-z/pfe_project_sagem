@@ -1,31 +1,3 @@
-"""
-db/models.py
-------------
-SQLAlchemy ORM table definitions.
-
-Schema
-------
-users
-  id, matricule, password_hash, full_name, role, created_at, last_login
-
-calibration_sessions
-  id, user_id, dut_serial, origin_serial, product_name,
-  dut_filename, origin_filename, tolerance_dbm,
-  overall_pass, tx_total, tx_pass, tx_fail, tx_corrections,
-  rx_total, rx_pass, rx_fail,
-  avg_delta_dbm, max_delta_dbm,
-  created_at
-
-tx_results          (one row per TX block per session)
-  id, session_id, band, block_number, freq_mhz, modulation,
-  bandwidth, antenna, origin_dbm, dut_dbm, delta_dbm,
-  correction_dbm, tx_target_dbm, limit_lo, limit_hi, status
-
-rx_results          (one row per RX block per session)
-  id, session_id, band, block_number, freq_mhz, mcs,
-  bandwidth, antenna_label, origin_rssi, dut_rssi, rssi_delta,
-  origin_per, dut_per, status
-"""
 
 from datetime import datetime
 from sqlalchemy import (

@@ -1,20 +1,3 @@
-"""
-db/config.py
-------------
-Database connection configuration using SQLAlchemy.
-Reads credentials from a .env file or environment variables.
-
-.env file example (place next to main.py):
-    DB_HOST=localhost
-    DB_PORT=5432
-    DB_NAME=wifi_calibration
-    DB_USER=postgres
-    DB_PASSWORD=yourpassword
-
-To create the database the first time:
-    python -c "from db.config import init_db; init_db()"
-"""
-
 import os
 from pathlib import Path
 from sqlalchemy import create_engine, text

@@ -1,10 +1,3 @@
-"""
-ui/user_config_dialog.py
-------------------------
-User configuration dialog: view info, change full name, change password.
-Modern UI/UX — theme-aware (dark & light mode).
-"""
-
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QFrame, QWidget, QSizePolicy,
@@ -20,10 +13,10 @@ def _t():
 
 class UserConfigDialog(QDialog):
 
-    def __init__(self, user, db, parent=None):
+    def __init__(self, user, api_url, parent=None):
         super().__init__(parent)
         self._user = user
-        self._db   = db
+        self._api_url = api_url
         self._tab  = 0  # 0=info, 1=name, 2=password
 
         self.setWindowTitle("User Configuration")
@@ -246,16 +239,18 @@ class UserConfigDialog(QDialog):
         return w
 
     def _save_name(self):
-        t = _t()
         new_name = self._name_edit.text().strip()
         if not new_name:
             self._msg(self._name_msg, "Please enter a name.", False)
             return
         try:
-            from db.models import User
-            user = self._db.query(User).filter_by(id=self._user.id).first()
-            user.full_name = new_name
-            self._db.commit()
+            import requests
+            r = requests.patch(
+                f"{self._api_url}/users/{self._user.id}/name",
+                json={"full_name": new_name},
+                timeout=10,
+            )
+            r.raise_for_status()
             self._user.full_name = new_name
             self._name_edit.clear()
             self._msg(self._name_msg, f"Name updated to '{new_name}'.", True)
@@ -300,6 +295,36 @@ class UserConfigDialog(QDialog):
         return w
 
     def _save_password(self):
+        old  = self._old_pass.text()
+        new  = self._new_pass.text()
+        conf = self._confirm_pass.text()
+
+        if not old or not new or not conf:
+            self._msg(self._pass_msg, "All fields are required.", False)
+            return
+        if new != conf:
+            self._msg(self._pass_msg, "New passwords don't match.", False)
+            return
+        if len(new) < 6:
+            self._msg(self._pass_msg, "Password must be at least 6 characters.", False)
+            return
+        try:
+            import requests
+            r = requests.patch(
+                f"{self._api_url}/users/{self._user.id}/password",
+                json={"old_password": old, "new_password": new},
+                timeout=10,
+            )
+            if r.status_code == 401:
+                self._msg(self._pass_msg, "Current password is incorrect.", False)
+                return
+            r.raise_for_status()
+            self._old_pass.clear()
+            self._new_pass.clear()
+            self._confirm_pass.clear()
+            self._msg(self._pass_msg, "Password changed successfully!", True)
+        except Exception as e:
+            self._msg(self._pass_msg, f"Error: {e}", False)
         old  = self._old_pass.text()
         new  = self._new_pass.text()
         conf = self._confirm_pass.text()

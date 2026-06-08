@@ -1,15 +1,7 @@
-"""
-ui/pages/history.py
--------------------
-History page — shows all past calibration sessions from the database.
-Clicking a row loads its TX/RX detail.
-"""
-
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QAbstractItemView, QMessageBox,
-    QLineEdit,
+    QHeaderView, QAbstractItemView, QMessageBox, QLineEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
@@ -22,31 +14,26 @@ _COLUMNS = [
     "ID", "DATE", "DUT SERIAL", "PRODUCT",
     "TX PASS", "TX FAIL", "CORRECTIONS",
     "RX PASS", "RX FAIL",
-    "AVG Δ dBm", "MAX |Δ|", "TOLERANCE", "OPERATOR", "RESULT",
+    "AVG Δ dBm", "MAX |Δ|", "TOLERANCE", "RESULT",
 ]
 
 
 class HistoryPage(QWidget):
-    """Loads all sessions from DB and displays them in a sortable table."""
 
-    session_selected = pyqtSignal(int)   # session_id → other pages can react
+    session_selected = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._sessions = []
-        self._db = None
+        self._api_url  = None
         self._build_ui()
-
-    # ── Build ─────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 16, 24, 16)
         root.setSpacing(12)
 
-        # ── Toolbar ───────────────────────────────────────────────────────────
         bar = QHBoxLayout()
-
         search_lbl = QLabel("Search:")
         search_lbl.setObjectName("metric_label")
         self._search = QLineEdit()
@@ -65,7 +52,6 @@ class HistoryPage(QWidget):
         self._export_btn.setEnabled(False)
         self._export_btn.clicked.connect(self._export_csv)
 
-        # Summary counts
         self._count_lbl = QLabel("0 sessions")
         self._count_lbl.setObjectName("metric_sub")
 
@@ -79,7 +65,6 @@ class HistoryPage(QWidget):
         bar.addWidget(self._export_btn)
         root.addLayout(bar)
 
-        # ── Table ─────────────────────────────────────────────────────────────
         self._table = QTableWidget(0, len(_COLUMNS))
         self._table.setHorizontalHeaderLabels(_COLUMNS)
         self._table.setAlternatingRowColors(True)
@@ -93,13 +78,11 @@ class HistoryPage(QWidget):
         self._table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._table.itemSelectionChanged.connect(self._on_selection)
 
-        widths = [36, 120, 140, 80, 60, 60, 80, 60, 60, 80, 80, 70, 90, 80]
+        widths = [36, 120, 140, 80, 60, 60, 80, 60, 60, 80, 80, 70, 80]
         for i, w in enumerate(widths):
             self._table.setColumnWidth(i, w)
-
         root.addWidget(self._table)
 
-        # ── No-data placeholder ───────────────────────────────────────────────
         self._empty_lbl = QLabel(
             "No sessions in database.\n"
             "Run a calibration to save the first entry."
@@ -111,23 +94,27 @@ class HistoryPage(QWidget):
         self._empty_lbl.setVisible(False)
         root.addWidget(self._empty_lbl)
 
-    # ── Public API ─────────────────────────────────────────────────────────────
+    # ── Public API ────────────────────────────────────────────────────────────
 
+    def set_api_url(self, api_url: str):
+        self._api_url = api_url
+
+    # keep backward compat if anything still calls set_db
     def set_db(self, db):
-        """Pass a live SQLAlchemy session."""
-        self._db = db
+        pass
 
     def refresh(self):
-        if self._db is None:
+        if not self._api_url:
             return
         try:
-            self._db.expire_all()                  
-            from db.repository import SessionRepo
-            self._sessions = SessionRepo.list_recent(self._db, limit=500)
+            import requests
+            r = requests.get(f"{self._api_url}/sessions?limit=500", timeout=10)
+            r.raise_for_status()
+            self._sessions = r.json()
             self._apply_filter()
             self._export_btn.setEnabled(bool(self._sessions))
         except Exception as e:
-            self._count_lbl.setText(f"DB error: {e}")
+            self._count_lbl.setText(f"API error: {e}")
 
     # ── Private ───────────────────────────────────────────────────────────────
 
@@ -137,9 +124,9 @@ class HistoryPage(QWidget):
         if q:
             filtered = [
                 s for s in filtered
-                if q in (s.dut_serial or "").lower()
-                or q in (s.product_name or "").lower()
-                or q in (s.origin_serial or "").lower()
+                if q in (s.get("dut_serial") or "").lower()
+                or q in (s.get("product_name") or "").lower()
+                or q in (s.get("origin_serial") or "").lower()
             ]
         self._populate(filtered)
 
@@ -151,32 +138,35 @@ class HistoryPage(QWidget):
             row = self._table.rowCount()
             self._table.insertRow(row)
 
-            avg = f"{s.avg_delta_dbm:+.3f}" if s.avg_delta_dbm is not None else "—"
-            mx  = f"{s.max_delta_dbm:.3f}"  if s.max_delta_dbm is not None else "—"
-            date_str = s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "—"
-            operator = s.user.username if s.user else "—"
+            avg = f"{s['avg_delta_dbm']:+.3f}" if s.get("avg_delta_dbm") is not None else "—"
+            mx  = f"{s['max_delta_dbm']:.3f}"  if s.get("max_delta_dbm") is not None else "—"
+            date_str = s.get("created_at", "—")[:16].replace("T", " ")
 
             cells = [
-                mono_item(str(s.id)),
+                mono_item(str(s["id"])),
                 mono_item(date_str),
-                mono_item(s.dut_serial or "—"),
-                mono_item(s.product_name or "—"),
-                mono_item(str(s.tx_pass),    color=QColor(styles.C_PASS)),
-                mono_item(str(s.tx_fail),    color=QColor(styles.C_FAIL) if s.tx_fail else None),
-                mono_item(str(s.tx_corrections), color=QColor(styles.C_WARN) if s.tx_corrections else None),
-                mono_item(str(s.rx_pass),    color=QColor(styles.C_PASS)),
-                mono_item(str(s.rx_fail),    color=QColor(styles.C_FAIL) if s.rx_fail else None),
+                mono_item(s.get("dut_serial") or "—"),
+                mono_item(s.get("product_name") or "—"),
+                mono_item(str(s.get("tx_pass", 0)),
+                          color=QColor(styles.C_PASS)),
+                mono_item(str(s.get("tx_fail", 0)),
+                          color=QColor(styles.C_FAIL) if s.get("tx_fail") else None),
+                mono_item(str(s.get("tx_corrections", 0)),
+                          color=QColor(styles.C_WARN) if s.get("tx_corrections") else None),
+                mono_item(str(s.get("rx_pass", 0)),
+                          color=QColor(styles.C_PASS)),
+                mono_item(str(s.get("rx_fail", 0)),
+                          color=QColor(styles.C_FAIL) if s.get("rx_fail") else None),
                 mono_item(avg),
                 mono_item(mx),
-                mono_item(f"{s.tolerance_dbm:.1f}"),
-                mono_item(operator),
-                status_item("PASS" if s.overall_pass else "FAIL"),
+                mono_item(f"{s.get('tolerance_dbm', 0):.1f}"),
+                status_item("PASS" if s.get("overall_pass") else "FAIL"),
             ]
 
             for col, item in enumerate(cells):
                 if item:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    item.setData(Qt.ItemDataRole.UserRole, s.id)
+                    item.setData(Qt.ItemDataRole.UserRole, s["id"])
                     self._table.setItem(row, col, item)
             self._table.setRowHeight(row, 28)
 
@@ -200,40 +190,41 @@ class HistoryPage(QWidget):
         sid = rows[0].data(Qt.ItemDataRole.UserRole)
         if sid is None:
             return
-
         reply = QMessageBox.question(
             self, "Delete session",
             f"Delete calibration session #{sid}?\nThis cannot be undone.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        if reply == QMessageBox.StandardButton.Yes and self._db:
-            from db.repository import SessionRepo
-            SessionRepo.delete(self._db, sid)
-            self.refresh()
+        if reply == QMessageBox.StandardButton.Yes and self._api_url:
+            try:
+                import requests
+                requests.delete(f"{self._api_url}/sessions/{sid}", timeout=10)
+                self.refresh()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Delete failed:\n{e}")
 
     def _export_csv(self):
         from PyQt6.QtWidgets import QFileDialog
         import csv
-
         path, _ = QFileDialog.getSaveFileName(
             self, "Export session history", "calibration_history.csv",
             "CSV files (*.csv)"
         )
         if not path:
             return
-
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(_COLUMNS)
             for s in self._sessions:
                 writer.writerow([
-                    s.id,
-                    s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "",
-                    s.dut_serial, s.product_name,
-                    s.tx_pass, s.tx_fail, s.tx_corrections,
-                    s.rx_pass, s.rx_fail,
-                    s.avg_delta_dbm, s.max_delta_dbm,
-                    s.tolerance_dbm,
-                    s.user.username if s.user else "",
-                    "PASS" if s.overall_pass else "FAIL",
+                    s["id"],
+                    s.get("created_at", "")[:16].replace("T", " "),
+                    s.get("dut_serial", ""),
+                    s.get("product_name", ""),
+                    s.get("tx_pass", 0), s.get("tx_fail", 0),
+                    s.get("tx_corrections", 0),
+                    s.get("rx_pass", 0), s.get("rx_fail", 0),
+                    s.get("avg_delta_dbm"), s.get("max_delta_dbm"),
+                    s.get("tolerance_dbm"),
+                    "PASS" if s.get("overall_pass") else "FAIL",
                 ])

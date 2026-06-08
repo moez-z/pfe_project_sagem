@@ -1,50 +1,34 @@
-"""
-ui/post_setup_dialog.py
------------------------
-First-launch dialog that lets the user select which post (Caisson)
-this machine is. The choice is saved to app_config.json and will be
-automatically used for every calibration session.
-"""
-
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QComboBox, QPushButton, QFrame, QMessageBox
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui  import QFont, QIcon
-
-from db.config     import SessionLocal
-from db.repository import PostRepo
+from PyQt6.QtGui  import QFont
 import core.app_config as app_config
 
 
 class PostSetupDialog(QDialog):
-    """
-    Shown on first launch (or when post is not configured).
-    Forces the user to pick a post before using the app.
-    """
 
-    def __init__(self, parent=None, allow_cancel: bool = False):
+    def __init__(self, api_url: str, parent=None, allow_cancel: bool = False):
         super().__init__(parent)
+        self.api_url       = api_url
+        self._allow_cancel = allow_cancel
+        self._posts        = []
+
         self.setWindowTitle("Post Configuration")
         self.setFixedSize(420, 280)
         self.setWindowFlags(
             Qt.WindowType.Dialog |
             Qt.WindowType.WindowTitleHint
         )
-        self._allow_cancel = allow_cancel
-        self._posts        = []
         self._build_ui()
         self._load_posts()
-
-    # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(24, 24, 24, 24)
 
-        # Header
         title = QLabel("Welcome — Post Setup")
         title.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         layout.addWidget(title)
@@ -58,13 +42,11 @@ class PostSetupDialog(QDialog):
         subtitle.setWordWrap(True)
         layout.addWidget(subtitle)
 
-        # Separator
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setStyleSheet("color: #e2e8f0;")
         layout.addWidget(line)
 
-        # Post selector
         selector_layout = QHBoxLayout()
         lbl = QLabel("Select Post:")
         lbl.setFixedWidth(100)
@@ -84,10 +66,8 @@ class PostSetupDialog(QDialog):
         selector_layout.addWidget(lbl)
         selector_layout.addWidget(self.combo)
         layout.addLayout(selector_layout)
-
         layout.addStretch()
 
-        # Buttons
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
@@ -96,10 +76,8 @@ class PostSetupDialog(QDialog):
             cancel_btn.setFixedSize(90, 36)
             cancel_btn.setStyleSheet("""
                 QPushButton {
-                    border: 1px solid #cbd5e1;
-                    border-radius: 6px;
-                    font-size: 12px;
-                    color: #64748b;
+                    border: 1px solid #cbd5e1; border-radius: 6px;
+                    font-size: 12px; color: #64748b;
                 }
                 QPushButton:hover { background: #f1f5f9; }
             """)
@@ -111,36 +89,30 @@ class PostSetupDialog(QDialog):
         self.confirm_btn.setEnabled(False)
         self.confirm_btn.setStyleSheet("""
             QPushButton {
-                background: #2563eb;
-                color: white;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: bold;
+                background: #2563eb; color: white;
+                border-radius: 6px; font-size: 12px; font-weight: bold;
             }
-            QPushButton:hover   { background: #1d4ed8; }
+            QPushButton:hover    { background: #1d4ed8; }
             QPushButton:disabled { background: #93c5fd; }
         """)
         self.confirm_btn.clicked.connect(self._on_confirm)
         btn_layout.addWidget(self.confirm_btn)
         layout.addLayout(btn_layout)
 
-    # ── Data ──────────────────────────────────────────────────────────────────
-
     def _load_posts(self):
-        """Load active posts from DB into the combo box."""
         try:
-            db = SessionLocal()
-            PostRepo.ensure_defaults(db)
-            self._posts = PostRepo.list_active(db)
-            db.close()
+            import requests
+            r = requests.get(f"{self.api_url}/posts", timeout=10)
+            r.raise_for_status()
+            self._posts = r.json()
         except Exception as e:
-            QMessageBox.critical(self, "DB Error",
-                                 f"Cannot load posts from database:\n{e}")
+            QMessageBox.critical(self, "API Error",
+                                 f"Cannot load posts from server:\n{e}")
             return
 
         self.combo.addItem("— Select a post —", userData=None)
         for post in self._posts:
-            self.combo.addItem(f"{post.name}", userData=post)
+            self.combo.addItem(post["name"], userData=post)
 
         self.combo.currentIndexChanged.connect(self._on_selection_changed)
 
@@ -152,14 +124,14 @@ class PostSetupDialog(QDialog):
         if post is None:
             return
         app_config.set_post(
-            post_id     = post.id,
-            post_number = post.number,
-            post_name   = post.name,
+            post_id     = post["id"],
+            post_number = post["number"],
+            post_name   = post["name"],
         )
         QMessageBox.information(
             self, "Post Configured",
             f"This machine is now configured as:\n\n"
-            f"  {post.name}\n\n"
+            f"  {post['name']}\n\n"
             f"Every calibration session will automatically\n"
             f"be linked to this post."
         )

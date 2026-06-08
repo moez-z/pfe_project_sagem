@@ -54,10 +54,10 @@ class MainWindow(QMainWindow):
         ("Statistics",      "▣"),
     ]
 
-    def __init__(self, user=None, db=None):
+    def __init__(self, user=None, api_url=None):
         super().__init__()
         self._user   = user
-        self._db     = db
+        self._api_url = api_url
         self._report = None
         self._thread = None
         self._worker = None
@@ -69,9 +69,9 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._nav_select(0)
 
-        if db:
-            self._history_page.set_db(db)
-            self._stats_page.set_db(db)
+        if api_url:
+            self._history_page.set_api_url(api_url)
+            self._stats_page.set_api_url(api_url)
             self._history_page.refresh()
             self._stats_page.refresh()
 
@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):
         post_name = app_config.get_post_name() or "No post"
         self._status_bar.showMessage(
             f"Ready.  |  Post: {post_name}"
-            + ("  |  DB connected" if self._db else "  |  Offline")
+            + ("  |  DB connected" if self._api_url else "  |  Offline")
         )
         self._dash_page.run_requested.connect(self._on_run_requested)
 
@@ -188,8 +188,8 @@ class MainWindow(QMainWindow):
         lay.addWidget(change_post_btn)
 
         # ── DB / operator info ────────────────────────────────────────────────
-        db_color = ACCENT if self._db else TEXT_SEC
-        db_text  = "● DB connected" if self._db else "○ Offline"
+        db_color = ACCENT if self._api_url else TEXT_SEC
+        db_text  = "● DB connected" if self._api_url else "○ Offline"
         db_lbl = QLabel(db_text)
         db_lbl.setStyleSheet(
             f"color: {db_color}; font-family: {FONT_MONO}; "
@@ -279,7 +279,7 @@ class MainWindow(QMainWindow):
     
     def _open_user_config(self):
         from ui.user_config_dialog import UserConfigDialog
-        dlg = UserConfigDialog(self._user, self._db, parent=self)
+        dlg = UserConfigDialog(self._user, self._api_url, parent=self)
         dlg.exec()
 
     def _toggle_theme(self):
@@ -307,7 +307,7 @@ class MainWindow(QMainWindow):
             self._post_lbl.setText(f"⬡  {post_name}")
             self._status_bar.showMessage(
                 f"Post changed to: {post_name}"
-                + ("  |  DB connected" if self._db else "  |  Offline")
+                + ("  |  DB connected" if self._api_url else "  |  Offline")
             )
 
     def _on_run_requested(self, origin_path, dut_path, tolerance):
@@ -349,41 +349,72 @@ class MainWindow(QMainWindow):
         if pl_path:
             self._corr_page.set_path_loss_file(pl_path)
 
-        # ── Persist to DB ─────────────────────────────────────────────────────
+       # ── Persist via API ───────────────────────────────────────────────
         session_id = None
-        db_error   = None
-        if self._db:
+        if self._api_url:
             try:
-                from db.repository import SessionRepo
-                uid     = self._user.id if self._user else None
-                post_id = app_config.get_post_id()          # ← auto from config
-                session_id = SessionRepo.save(
-                    self._db, report,
-                    user_id = uid,
-                    post_id = post_id,                       # ← NEW
-                )
+                import requests
+                payload = {
+                    "user_id":       self._user.id if self._user else None,
+                    "post_id":       app_config.get_post_id(),
+                    "dut_serial":    report.dut_serial,
+                    "origin_serial": report.origin_serial,
+                    "product_name":  report.product_name,
+                    "tolerance_dbm": report.tolerance_dbm,
+                    "overall_pass":  report.overall_pass,
+                    "tx_total":      len(report.tx_results),
+                    "tx_pass":       report.tx_pass_count,
+                    "tx_fail":       report.tx_fail_count,
+                    "tx_corrections":report.tx_needs_correction_count,
+                    "rx_total":      len(report.rx_results),
+                    "rx_pass":       report.rx_pass_count,
+                    "rx_fail":       report.rx_fail_count,
+                    "avg_delta_dbm": report.tx_avg_delta,
+                    "max_delta_dbm": report.tx_max_delta,
+                    "tx_results": [
+                        {
+                            "band":           r.band.value if r.band else "",
+                            "block_number":   r.block_number,
+                            "freq_mhz":       r.freq_mhz,
+                            "modulation":     r.modulation,
+                            "bandwidth":      r.bandwidth,
+                            "antenna":        r.antenna,
+                            "origin_dbm":     r.origin_measured_dbm,
+                            "dut_dbm":        r.dut_measured_dbm,
+                            "delta_dbm":      r.delta_dbm,
+                            "correction_dbm": r.correction_dbm,
+                            "tx_target_dbm":  r.tx_target_dbm,
+                            "limit_lo":       r.tx_limit_lo,
+                            "limit_hi":       r.tx_limit_hi,
+                            "status":         r.status.value,
+                        }
+                        for r in report.tx_results
+                    ],
+                    "rx_results": [
+                        {
+                            "band":          r.band.value if r.band else "",
+                            "block_number":  r.block_number,
+                            "freq_mhz":      r.freq_mhz,
+                            "mcs":           r.mcs,
+                            "bandwidth":     r.bandwidth,
+                            "antenna_label": r.antenna_label,
+                            "origin_rssi":   r.origin_rssi,
+                            "dut_rssi":      r.dut_rssi,
+                            "rssi_delta":    r.rssi_delta,
+                            "origin_per":    r.origin_per,
+                            "dut_per":       r.dut_per,
+                            "status":        r.status.value,
+                        }
+                        for r in report.rx_results
+                    ],
+                }
+                r = requests.post(f"{self._api_url}/sessions",
+                                json=payload, timeout=15)
+                session_id = r.json().get("id")
                 self._history_page.refresh()
                 self._stats_page.refresh()
             except Exception as e:
-                import traceback
-                db_error = f"{e}\n{traceback.format_exc()}"
-                print(f"[DB ERROR] {db_error}")
-
-        self._pdf_btn.setEnabled(True)
-
-        if db_error:
-            self._status_bar.showMessage(
-                f"⚠  DB save failed: {db_error.splitlines()[0]}"
-            )
-        else:
-            post_name = app_config.get_post_name() or "No post"
-            sid_str   = f"  |  Session #{session_id}" if session_id else ""
-            self._status_bar.showMessage(
-                f"✓  {len(report.tx_results)} TX, {len(report.rx_results)} RX.  "
-                f"Corrections: {len(corrections)}  |  RX fail: {report.rx_fail_count}"
-                f"  |  Post: {post_name}"
-                + sid_str
-            )
+                print(f"[API ERROR] {e}")
 
     def _on_error(self, msg):
         self._update_badge("fail", "ERROR")
@@ -421,9 +452,9 @@ class MainWindow(QMainWindow):
             return
 
         # Close DB session
-        if self._db:
-            self._db.close()
-            self._db = None
+        if self._api_url:
+            self._api_url.close()
+            self._api_url = None
 
         self.close()
 
@@ -454,55 +485,35 @@ class MainWindow(QMainWindow):
 
 
 def run_app():
+    import os, requests
     app = QApplication(sys.argv)
-    app.setApplicationName("WiFi Calibration Tool")
     app.setStyleSheet(APP_STYLE)
 
-    user = None
-    db   = None
+    API_URL = os.environ.get("API_URL", "http://localhost:8000")
+
+    user    = None
+    api_url = None
 
     try:
-        from db.config import test_connection, SessionLocal, init_db
-        from db.repository import UserRepo, PostRepo
-
-        ok, msg = test_connection()
-        if ok:
-            # Init DB and ensure defaults
-            init_db()
-            _tmp_db = SessionLocal()
-            UserRepo.ensure_default_admin(_tmp_db)
-            PostRepo.ensure_defaults(_tmp_db)         # ← create posts 1-10
-            _tmp_db.close()
-
-            # Login
+        r = requests.get(f"{API_URL}/health", timeout=5)
+        if r.status_code == 200:
+            api_url = API_URL
             from ui.login_dialog import LoginDialog
-            dlg = LoginDialog()
+            dlg = LoginDialog(api_url=api_url)
             if dlg.exec() != LoginDialog.DialogCode.Accepted:
                 sys.exit(0)
             user = dlg.user
-            db   = SessionLocal()
 
-            # ── First-launch post setup ──────────────────────────────────────
             if not app_config.is_configured():
-                setup = PostSetupDialog(allow_cancel=False)
+                setup = PostSetupDialog(api_url=api_url, allow_cancel=False)
                 if setup.exec() != PostSetupDialog.DialogCode.Accepted:
-                    sys.exit(0)                        # can't proceed without post
+                    sys.exit(0)
         else:
-            QMessageBox.warning(
-                None, "Database unavailable",
-                f"Cannot connect to PostgreSQL:\n{msg}\n\n"
-                "Running in offline mode (no login, no history saved).\n"
-                "Edit your .env file to enable DB features."
-            )
+            QMessageBox.warning(None, "Server unavailable",
+                                f"Cannot connect to API.\nRunning offline.")
     except Exception as e:
-        QMessageBox.warning(
-            None, "DB not configured",
-            f"Running in offline mode.\n\nDetails: {e}"
-        )
+        QMessageBox.warning(None, "Offline", f"Running offline.\n{e}")
 
-    window = MainWindow(user=user, db=db)
+    window = MainWindow(user=user, api_url=api_url)
     window.show()
-    ret = app.exec()
-    if db:
-        db.close()
-    sys.exit(ret)
+    sys.exit(app.exec())
