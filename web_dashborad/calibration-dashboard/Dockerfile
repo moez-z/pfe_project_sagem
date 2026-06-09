@@ -24,5 +24,6 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma          
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-EXPOSE 1000
+EXPOSE 10000
+ENV PORT=10000
 CMD ["node", "server.js"]
