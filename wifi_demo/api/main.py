@@ -149,3 +149,9 @@ def stats_deltas(limit: int = 30, db: Session = Depends(get_db)):
 @app.get("/posts", response_model=list[PostOut])
 def list_posts(db: Session = Depends(get_db)):
     return PostRepo.list_all(db)
+
+@app.get("/debug/users")
+def debug_users(db: Session = Depends(get_db)):
+    from db.models import User
+    users = db.query(User).all()
+    return [{"id": u.id, "matricule": u.matricule, "role": u.role, "hash_prefix": u.password_hash[:20]} for u in users]

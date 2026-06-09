@@ -115,7 +115,7 @@ function LoginForm() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          wifi_calibration · localhost
+          wifi_calibration 
         </p>
       </div>
     </div>
