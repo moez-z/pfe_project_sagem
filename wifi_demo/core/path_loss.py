@@ -202,7 +202,7 @@ class PathLossTable:
                     if value is None:
                         row.append("")
                     else:
-                        row.append(f"{value:.3f}")
+                        row.append(f"{value:.2f}")
 
                 writer.writerow(row)
 

@@ -1,18 +1,3 @@
-"""
-ui/pages/corrections_page.py
------------------------------
-Corrections page — shows every TX block that requires an EEPROM correction.
-
-The NOTE column now contains an "Apply Correction" button instead of plain
-text.  Clicking it:
-  1. Opens a file-picker if no path_loss.csv is loaded yet (or re-uses the
-     last one).
-  2. Looks up the cable / path-loss for the block's frequency + antenna.
-  3. Displays a confirmation dialog with the computed corrected value.
-  4. On confirmation the button turns into a green "✔ Applied" label and
-     the row is updated with the corrected origin value.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -24,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QTextEdit,
     QFileDialog, QMessageBox, QTableWidgetItem,
-    QSizePolicy,
+    QSizePolicy, QCheckBox,
 )
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -44,31 +29,32 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Column layout
+# Column layout  (checkbox added as first column)
 # ---------------------------------------------------------------------------
 
 _COLUMNS = [
-    "BAND", "BLK", "FREQ (MHz)", "MOD", "BW", "ANT",
+    "✓", "BAND", "BLK", "FREQ (MHz)", "MOD", "BW", "ANT",
     "ORIGIN dBm", "DUT dBm", "DELTA", "CORRECTION TO APPLY", "STATUS", "NOTE",
 ]
 
-# Convenience indices
-_COL_BAND   = 0
-_COL_BLK    = 1
-_COL_FREQ   = 2
-_COL_MOD    = 3
-_COL_BW     = 4
-_COL_ANT    = 5
-_COL_ORIGIN = 6
-_COL_DUT    = 7
-_COL_DELTA  = 8
-_COL_CORR   = 9
-_COL_STATUS = 10
-_COL_NOTE   = 11
+# Convenience indices (shifted by 1 due to checkbox column)
+_COL_CHECK  = 0
+_COL_BAND   = 1
+_COL_BLK    = 2
+_COL_FREQ   = 3
+_COL_MOD    = 4
+_COL_BW     = 5
+_COL_ANT    = 6
+_COL_ORIGIN = 7
+_COL_DUT    = 8
+_COL_DELTA  = 9
+_COL_CORR   = 10
+_COL_STATUS = 11
+_COL_NOTE   = 12
 
 
 # ---------------------------------------------------------------------------
-# Small helper — read-only label used after a correction is applied
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _applied_label(text: str = "✔ Applied", color: str = "#00C853") -> QLabel:
@@ -81,6 +67,17 @@ def _applied_label(text: str = "✔ Applied", color: str = "#00C853") -> QLabel:
     return lbl
 
 
+def _centered_checkbox() -> QWidget:
+    """Return a QCheckBox centered inside a QWidget for table cell use."""
+    container = QWidget()
+    layout = QHBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    cb = QCheckBox()
+    layout.addWidget(cb)
+    return container
+
+
 # ---------------------------------------------------------------------------
 # CorrectionsPage
 # ---------------------------------------------------------------------------
@@ -88,8 +85,6 @@ def _applied_label(text: str = "✔ Applied", color: str = "#00C853") -> QLabel:
 class CorrectionsPage(QWidget):
     """Corrections page widget."""
 
-    # Emitted when a correction is successfully applied
-    # payload: dict with the same keys as get_corrections() items
     correction_applied = pyqtSignal(dict)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -97,8 +92,8 @@ class CorrectionsPage(QWidget):
         self._corrections: list[dict] = []
         self._path_loss_table: Optional["PathLossTable"] = None
         self._path_loss_path: str = ""
-        # Track application state per row: row_index → bool
         self._applied: dict[str, bool] = {}
+        self._select_all_state: bool = False
         self._build_ui()
 
     # -----------------------------------------------------------------------
@@ -153,9 +148,58 @@ class CorrectionsPage(QWidget):
 
         root.addLayout(info_row)
 
+        # ── Selection action row ─────────────────────────────────────────────
+        action_row = QHBoxLayout()
+        action_row.setSpacing(8)
+
+        self._select_all_btn = QPushButton("☐  Select All")
+        self._select_all_btn.setFixedHeight(30)
+        self._select_all_btn.setStyleSheet(
+            "QPushButton {"
+            "  background: #263238;"
+            f"  color: {styles.TEXT_PRI};"
+            "  border: 1px solid #455A64;"
+            "  border-radius: 4px;"
+            "  padding: 0 12px;"
+            "  font-size: 11px;"
+            "}"
+            "QPushButton:hover { border-color: #00BCD4; color: #00BCD4; }"
+        )
+        self._select_all_btn.clicked.connect(self._toggle_select_all)
+        action_row.addWidget(self._select_all_btn)
+
+        self._apply_selected_btn = QPushButton("⚡ Apply Selected")
+        self._apply_selected_btn.setFixedHeight(30)
+        self._apply_selected_btn.setEnabled(False)
+        self._apply_selected_btn.setStyleSheet(
+            "QPushButton {"
+            "  background: #1B5E20;"
+            "  color: white;"
+            "  border: none;"
+            "  border-radius: 4px;"
+            "  padding: 0 16px;"
+            "  font-size: 11px;"
+            "  font-weight: bold;"
+            "}"
+            "QPushButton:hover  { background: #2E7D32; }"
+            "QPushButton:pressed { background: #1B5E20; }"
+            "QPushButton:disabled { background: #333; color: #666; }"
+        )
+        self._apply_selected_btn.clicked.connect(self._on_apply_selected)
+        action_row.addWidget(self._apply_selected_btn)
+
+        self._selection_lbl = QLabel("0 rows selected")
+        self._selection_lbl.setStyleSheet(
+            f"color: {styles.TEXT_SEC}; font-size: 10px;"
+        )
+        action_row.addWidget(self._selection_lbl)
+        action_row.addStretch()
+
+        root.addLayout(action_row)
+
         # ── Correction table ─────────────────────────────────────────────────
         self._table = CalibrationTable(_COLUMNS)
-        widths = [72, 40, 90, 72, 60, 55, 95, 95, 90, 130, 120, 200]
+        widths = [32, 72, 40, 90, 72, 60, 55, 95, 95, 90, 130, 120, 200]
         for i, w in enumerate(widths):
             self._table.setColumnWidth(i, w)
         root.addWidget(self._table)
@@ -184,44 +228,79 @@ class CorrectionsPage(QWidget):
     # -----------------------------------------------------------------------
 
     def load_corrections(self, corrections: list[dict], tolerance: float) -> None:
-        """
-        Populate the page with the corrections produced by
-        ``CalibrationEngine.get_corrections()``.
-
-        Parameters
-        ----------
-        corrections : list[dict]
-            Each dict has the keys returned by ``get_corrections()``.
-        tolerance : float
-            The TX tolerance (dBm) that was used during calibration.
-        """
         self._corrections = corrections
         self._applied.clear()
+        self._select_all_state = False
+        self._select_all_btn.setText("☐  Select All")
         self._populate_table(corrections)
         self._update_metrics(corrections)
         self._build_summary(corrections, tolerance)
         self._export_btn.setEnabled(bool(corrections))
+        self._update_selection_label()
 
     def set_path_loss_file(self, filepath: str) -> None:
-        """
-        Pre-load a path-loss file programmatically (e.g. from settings).
-        """
         self._do_load_path_loss(filepath)
+
+    # -----------------------------------------------------------------------
+    # Selection helpers
+    # -----------------------------------------------------------------------
+
+    def _get_checkbox(self, row: int) -> Optional[QCheckBox]:
+        """Return the QCheckBox widget for a given row, or None."""
+        container = self._table.cellWidget(row, _COL_CHECK)
+        if container is None:
+            return None
+        cb = container.findChild(QCheckBox)
+        return cb
+
+    def _toggle_select_all(self) -> None:
+        self._select_all_state = not self._select_all_state
+        label = "☑  Deselect All" if self._select_all_state else "☐  Select All"
+        self._select_all_btn.setText(label)
+
+        for row in range(self._table.rowCount()):
+            # Skip already-applied rows
+            if self._applied.get(self._corrections[row].get("label", row)):
+                continue
+            cb = self._get_checkbox(row)
+            if cb:
+                cb.setChecked(self._select_all_state)
+
+        self._update_selection_label()
+
+    def _update_selection_label(self) -> None:
+        count = self._count_selected()
+        self._selection_lbl.setText(f"{count} row{'s' if count != 1 else ''} selected")
+        self._apply_selected_btn.setEnabled(count > 0)
+
+    def _count_selected(self) -> int:
+        count = 0
+        for row in range(self._table.rowCount()):
+            cb = self._get_checkbox(row)
+            if cb and cb.isChecked():
+                count += 1
+        return count
+
+    def _get_selected_rows(self) -> list[tuple[int, dict]]:
+        """Return list of (row_index, correction_dict) for checked rows."""
+        selected = []
+        for row in range(self._table.rowCount()):
+            cb = self._get_checkbox(row)
+            if cb and cb.isChecked():
+                selected.append((row, self._corrections[row]))
+        return selected
 
     # -----------------------------------------------------------------------
     # Path-loss loading
     # -----------------------------------------------------------------------
 
     def _load_path_loss(self) -> None:
-        """Open a file dialog and load the selected CSV."""
         start_dir = (
             str(Path(self._path_loss_path).parent)
             if self._path_loss_path else ""
         )
         path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select path_loss.csv",
-            start_dir,
+            self, "Select path_loss.csv", start_dir,
             "CSV files (*.csv);;All files (*.*)",
         )
         if path:
@@ -235,14 +314,11 @@ class CorrectionsPage(QWidget):
                 "Make sure core/path_loss.py exists.",
             )
             return
-
         try:
             table = PathLossTable.load(path)
         except Exception as exc:
-            QMessageBox.critical(
-                self, "Load error",
-                f"Could not load path-loss file:\n{exc}",
-            )
+            QMessageBox.critical(self, "Load error",
+                                 f"Could not load path-loss file:\n{exc}")
             return
 
         self._path_loss_table = table
@@ -254,8 +330,6 @@ class CorrectionsPage(QWidget):
             "color: #00C853; font-size: 10px; font-weight: bold;"
         )
         self._pl_btn.setText(f"📂 {fname}")
-
-        # Refresh buttons in the table so they become active
         self._refresh_note_buttons()
 
     # -----------------------------------------------------------------------
@@ -289,6 +363,7 @@ class CorrectionsPage(QWidget):
             )
 
             self._table.add_row([
+                QTableWidgetItem(""),       # placeholder for checkbox column
                 make_band_item(c.get("band", "")),
                 mono_item(str(c.get("label", "").split(".")[0])),
                 mono_item(str(c.get("freq_mhz", ""))),
@@ -300,28 +375,35 @@ class CorrectionsPage(QWidget):
                 delta_item_,
                 corr_item,
                 status_item(c.get("status", "")),
-                # NOTE column — placeholder item (button set below)
                 mono_item(""),
             ])
 
-            # Place the "Apply Correction" button in the NOTE column
+            # Place checkbox widget in column 0
+            cb_widget = _centered_checkbox()
+            cb = cb_widget.findChild(QCheckBox)
+            if cb:
+                cb.stateChanged.connect(lambda _s: self._update_selection_label())
+            self._table.setCellWidget(row_idx, _COL_CHECK, cb_widget)
+
+            # Place apply button in NOTE column
             self._set_note_button(row_idx, c)
 
         self._table.setSortingEnabled(True)
 
     def _set_note_button(self, row: int, correction: dict) -> None:
-        """
-        Insert an 'Apply Correction' button into the NOTE cell for *row*.
-        If the correction has already been applied, show the applied label.
-        """
-        if self._applied.get(row):
+        if self._applied.get(correction.get("label", row)):
             self._table.setCellWidget(row, _COL_NOTE, _applied_label())
+            # Disable & uncheck checkbox for applied rows
+            cb = self._get_checkbox(row)
+            if cb:
+                cb.setChecked(False)
+                cb.setEnabled(False)
             return
 
         btn = QPushButton("⚡ Apply Correction")
         btn.setFixedHeight(26)
         btn.setToolTip(
-            f"Apply correction of {correction.get('correction_dbm', 0):+.3f} dBm\n"
+            f"Apply correction of {correction.get('correction_dbm', 0):+.2f} dBm\n"
             f"for {correction.get('label', '')}"
         )
         btn.setStyleSheet(
@@ -338,40 +420,24 @@ class CorrectionsPage(QWidget):
             "QPushButton:pressed { background: #0D47A1; }"
             "QPushButton:disabled { background: #333; color: #666; }"
         )
-
-        # Capture loop variable with default argument
         btn.clicked.connect(
             lambda _checked, r=row, c=correction: self._on_apply_correction(r, c)
         )
         self._table.setCellWidget(row, _COL_NOTE, btn)
 
     def _refresh_note_buttons(self) -> None:
-        """Re-create all NOTE buttons (called after a path-loss file is loaded)."""
         for row_idx, c in enumerate(self._corrections):
-            if not self._applied.get(row_idx):
+            if not self._applied.get(c.get("label", row_idx)):
                 self._set_note_button(row_idx, c)
 
     # -----------------------------------------------------------------------
-    # Correction logic
+    # Single correction
     # -----------------------------------------------------------------------
 
     def _on_apply_correction(self, row: int, correction: dict) -> None:
-        """
-        Called when the user clicks "Apply Correction" for a specific row.
-
-        Steps
-        -----
-        1. Resolve path-loss value (load file if not done yet).
-        2. Compute corrected origin value = origin_measured + correction_dbm
-           (optionally adjusted by path loss).
-        3. Show confirmation dialog.
-        4. Mark row as applied, replace button with ✔ label.
-        """
-        # ── 1. Ensure a path-loss file is loaded ─────────────────────────────
         if self._path_loss_table is None:
             reply = QMessageBox.question(
-                self,
-                "Path-loss file required",
+                self, "Path-loss file required",
                 "No path-loss CSV file is loaded.\n\n"
                 "Would you like to select one now?\n"
                 "(Click 'No' to apply correction without path-loss compensation.)",
@@ -383,26 +449,19 @@ class CorrectionsPage(QWidget):
                 return
             if reply == QMessageBox.StandardButton.Yes:
                 self._load_path_loss()
-                # If user cancelled the file dialog, path_loss_table is still None
-                # → proceed without it
 
-        # ── 2. Build correction info ──────────────────────────────────────────
-        freq_mhz      = correction.get("freq_mhz", 0)
-        antenna       = correction.get("antenna", "")
-        origin_dbm    = correction.get("origin_measured_dbm", 0.0) or 0.0
-        dut_dbm       = correction.get("dut_measured_dbm", 0.0) or 0.0
-        delta_dbm     = correction.get("delta_dbm", 0.0) or 0.0
+        freq_mhz       = correction.get("freq_mhz", 0)
+        antenna        = correction.get("antenna", "")
+        origin_dbm     = correction.get("origin_measured_dbm", 0.0) or 0.0
+        dut_dbm        = correction.get("dut_measured_dbm", 0.0) or 0.0
+        delta_dbm      = correction.get("delta_dbm", 0.0) or 0.0
         correction_dbm = correction.get("correction_dbm", 0.0) or 0.0
         label          = correction.get("label", "")
 
-        # Path-loss lookup
         path_loss: Optional[float] = None
         if self._path_loss_table is not None:
             path_loss = self._path_loss_table.get_loss(freq_mhz, antenna)
 
-        # Corrected value to write to EEPROM
-        # = correction_dbm  (+ path_loss if available, as an informational note)
-        eeprom_correction = correction_dbm
         path_loss_note = ""
         if path_loss is not None:
             path_loss_note = (
@@ -410,30 +469,24 @@ class CorrectionsPage(QWidget):
                 f"{path_loss:+.2f} dBm"
             )
 
-        # ── 3. Confirmation dialog ────────────────────────────────────────────
         details = (
             f"Block  : {label}\n"
             f"Band   : {correction.get('band', '')}\n"
             f"Freq   : {freq_mhz} MHz\n"
-            f"Antenna: {antenna}\n"
-            f"\n"
-            f"Origin measured : {origin_dbm:+.3f} dBm\n"
-            f"DUT measured    : {dut_dbm:+.3f} dBm\n"
-            f"Delta           : {delta_dbm:+.3f} dBm\n"
-            f"\n"
-            f"EEPROM correction to apply: {eeprom_correction:+.3f} dBm"
+            f"Antenna: {antenna}\n\n"
+            f"Origin measured : {origin_dbm:+.2f} dBm\n"
+            f"DUT measured    : {dut_dbm:+.2f} dBm\n"
+            f"Delta           : {delta_dbm:+.2f} dBm\n\n"
+            f"EEPROM correction to apply: {correction_dbm:+.2f} dBm"
             f"{path_loss_note}\n"
         )
 
         msg = QMessageBox(self)
         msg.setWindowTitle("Apply EEPROM Correction")
         msg.setIcon(QMessageBox.Icon.Question)
-        msg.setText(
-            f"<b>Apply correction for block:</b><br>"
-            f"<code>{label}</code>"
-        )
+        msg.setText(f"<b>Apply correction for block:</b><br><code>{label}</code>")
         msg.setInformativeText(
-            f"EEPROM correction: <b>{eeprom_correction:+.3f} dBm</b>"
+            f"EEPROM correction: <b>{correction_dbm:+.2f} dBm</b>"
             + (f"<br>Path-loss: <b>{path_loss:+.2f} dBm</b>" if path_loss is not None else "")
         )
         msg.setDetailedText(details)
@@ -442,84 +495,139 @@ class CorrectionsPage(QWidget):
         )
         msg.setDefaultButton(QMessageBox.StandardButton.Apply)
 
-        result = msg.exec()
-
-        if result != QMessageBox.StandardButton.Apply:
+        if msg.exec() != QMessageBox.StandardButton.Apply:
             return
 
-       # ── 4. Apply correction to path-loss file ─────────────────
+        self._do_apply(row, correction)
+
+    # -----------------------------------------------------------------------
+    # Multi-correction (Apply Selected)
+    # -----------------------------------------------------------------------
+
+    def _on_apply_selected(self) -> None:
+        selected = self._get_selected_rows()
+        if not selected:
+            return
+
+        # Ensure path-loss file if needed
+        if self._path_loss_table is None:
+            reply = QMessageBox.question(
+                self, "Path-loss file required",
+                "No path-loss CSV file is loaded.\n\n"
+                "Would you like to select one now?\n"
+                "(Click 'No' to apply corrections without path-loss compensation.)",
+                QMessageBox.StandardButton.Yes |
+                QMessageBox.StandardButton.No  |
+                QMessageBox.StandardButton.Cancel,
+            )
+            if reply == QMessageBox.StandardButton.Cancel:
+                return
+            if reply == QMessageBox.StandardButton.Yes:
+                self._load_path_loss()
+
+        # Build summary for confirmation dialog
+        summary_lines = []
+        for _row, c in selected:
+            corr = c.get("correction_dbm", 0.0) or 0.0
+            summary_lines.append(
+                f"  • {c.get('label', ''):<40}  {corr:+.2f} dBm"
+            )
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Apply Selected Corrections")
+        msg.setIcon(QMessageBox.Icon.Question)
+        msg.setText(
+            f"<b>Apply corrections to {len(selected)} selected block(s)?</b>"
+        )
+        msg.setInformativeText(
+            "This will update the path-loss file for all selected blocks.\n"
+            "A backup will be created automatically."
+        )
+        msg.setDetailedText("\n".join(summary_lines))
+        msg.setStandardButtons(
+            QMessageBox.StandardButton.Apply | QMessageBox.StandardButton.Cancel
+        )
+        msg.setDefaultButton(QMessageBox.StandardButton.Apply)
+
+        if msg.exec() != QMessageBox.StandardButton.Apply:
+            return
+
+        # Apply all selected
+        failed = []
+        for row, correction in selected:
+            try:
+                self._do_apply(row, correction)
+            except Exception as exc:
+                failed.append(f"{correction.get('label', row)}: {exc}")
+
+        if failed:
+            QMessageBox.warning(
+                self, "Some corrections failed",
+                "The following corrections could not be applied:\n\n"
+                + "\n".join(failed)
+            )
+        else:
+            QMessageBox.information(
+                self, "Done",
+                f"✔ {len(selected)} correction(s) applied successfully."
+            )
+
+        self._update_selection_label()
+
+    # -----------------------------------------------------------------------
+    # Core apply logic (shared by single and multi)
+    # -----------------------------------------------------------------------
+
+    def _do_apply(self, row: int, correction: dict) -> None:
+        freq_mhz       = correction.get("freq_mhz", 0)
+        antenna        = correction.get("antenna", "")
+        correction_dbm = correction.get("correction_dbm", 0.0) or 0.0
+        label          = correction.get("label", "")
 
         updated_loss = None
-        backup_path = None
+        backup_path  = None
 
         try:
             if self._path_loss_table is not None:
-                # Create automatic backup
-                backup_path = self._path_loss_table.backup()
-
-                # Apply correction in memory
+                backup_path  = self._path_loss_table.backup()
                 updated_loss = self._path_loss_table.apply_correction(
                     freq_mhz=freq_mhz,
                     antenna=antenna,
                     correction_db=correction_dbm,
                 )
-
-                # Save updated CSV
                 self._path_loss_table.save()
-
         except Exception as exc:
-            QMessageBox.critical(
-                self,
-                "Correction failed",
-                f"Could not update path-loss file:\n\n{exc}",
-            )
-            return
+            raise RuntimeError(f"Could not update path-loss file: {exc}") from exc
 
-        # Mark row as applied
+        # Mark applied
         self._applied[label] = True
 
-        # Replace button with green label
-        applied_lbl = _applied_label(
-            f"✔ Applied ({correction_dbm:+.3f} dBm)"
-        )
-
+        # Update UI
+        applied_lbl = _applied_label(f"✔ Applied ({correction_dbm:+.2f} dBm)")
         self._table.setCellWidget(row, _COL_NOTE, applied_lbl)
+
+        # Disable checkbox
+        cb = self._get_checkbox(row)
+        if cb:
+            cb.setChecked(False)
+            cb.setEnabled(False)
 
         # Update correction dict
         correction["path_loss_db"] = updated_loss
         correction["applied"] = True
         correction["eeprom_correction_dbm"] = correction_dbm
 
-        # Emit signal
         self.correction_applied.emit(correction)
-
-        # Update summary
         self._mark_applied_in_summary(label, correction_dbm)
 
-        # Success dialog
-        msg_text = (
-            f"Path-loss file updated successfully.\n\n"
-            f"Updated value: {updated_loss:.3f} dB"
-        )
-
-        if backup_path:
-            msg_text += f"\nBackup saved to:\n{backup_path}"
-
-        QMessageBox.information(
-            self,
-            "Correction Applied",
-            msg_text,
-        )
-
     def _mark_applied_in_summary(self, label: str, value: float) -> None:
-        """Append an 'Applied' note to the summary text box."""
         current = self._summary_box.toPlainText()
-        marker = f"\n  ✔ APPLIED: {label}  →  {value:+.3f} dBm"
+        marker = f"\n  ✔ APPLIED: {label}  →  {value:+.2f} dBm"
         if marker not in current:
             self._summary_box.setPlainText(current + marker)
 
     # -----------------------------------------------------------------------
-    # Metrics update
+    # Metrics
     # -----------------------------------------------------------------------
 
     def _update_metrics(self, corrections: list[dict]) -> None:
@@ -535,7 +643,7 @@ class CorrectionsPage(QWidget):
         )
 
     # -----------------------------------------------------------------------
-    # Summary text
+    # Summary
     # -----------------------------------------------------------------------
 
     def _build_summary(self, corrections: list[dict], tolerance: float) -> None:
@@ -559,13 +667,10 @@ class CorrectionsPage(QWidget):
             corr = c.get("correction_dbm", 0)
             lines.append(
                 f"  {c['label']:<40}  "
-                f"delta={c['delta_dbm']:+.3f} dBm  →  "
-                f"correction = {corr:+.3f} dBm"
+                f"delta={c['delta_dbm']:+.2f} dBm  →  "
+                f"correction = {corr:+.2f} dBm"
             )
-        lines += [
-            "─" * 60,
-            f"Total: {len(corrections)} block(s) require correction.",
-        ]
+        lines += ["─" * 60, f"Total: {len(corrections)} block(s) require correction."]
         self._summary_box.setPlainText("\n".join(lines))
         self._summary_box.setStyleSheet(
             f"background-color: {styles.BG_BASE}; "
@@ -595,18 +700,10 @@ class CorrectionsPage(QWidget):
             ])
             for c in self._corrections:
                 writer.writerow([
-                    c.get("label"),
-                    c.get("band"),
-                    c.get("freq_mhz"),
-                    c.get("modulation"),
-                    c.get("bandwidth"),
-                    c.get("antenna"),
-                    c.get("origin_measured_dbm"),
-                    c.get("dut_measured_dbm"),
-                    c.get("delta_dbm"),
-                    c.get("correction_dbm"),
-                    c.get("status"),
-                    c.get("warning"),
-                    c.get("path_loss_db", ""),
-                    c.get("applied", False),
+                    c.get("label"), c.get("band"), c.get("freq_mhz"),
+                    c.get("modulation"), c.get("bandwidth"), c.get("antenna"),
+                    c.get("origin_measured_dbm"), c.get("dut_measured_dbm"),
+                    c.get("delta_dbm"), c.get("correction_dbm"),
+                    c.get("status"), c.get("warning"),
+                    c.get("path_loss_db", ""), c.get("applied", False),
                 ])
