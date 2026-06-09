@@ -34,25 +34,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.matricule || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { matricule: credentials.matricule as string },
-        });
+        try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              matricule: credentials.matricule,
+              password: credentials.password,
+            }),
+          });
 
-        if (!user) return null;
-        if (user.role?.toLowerCase() !== "admin") return null;
+          if (!res.ok) return null;
 
-        const valid = await bcrypt.compare(
-          credentials.password as string,
-          user.password_hash,
-        );
-        if (!valid) return null;
+          const user = await res.json();
+          if (user.role?.toLowerCase() !== "admin") return null;
 
-        return {
-          id: String(user.id),
-          name: user.full_name,
-          email: user.matricule,
-          role: user.role,
-        };
+          return {
+            id: String(user.id),
+            name: user.full_name,
+            email: user.matricule,
+            role: user.role,
+          };
+        } catch {
+          return null;
+        }
       },
     }),
   ],

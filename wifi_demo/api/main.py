@@ -155,3 +155,21 @@ def debug_users(db: Session = Depends(get_db)):
     from db.models import User
     users = db.query(User).all()
     return [{"id": u.id, "matricule": u.matricule, "role": u.role, "hash_prefix": u.password_hash[:20]} for u in users]
+
+@app.post("/posts", status_code=201)
+def create_post(body: dict, db: Session = Depends(get_db)):
+    from db.models import Post
+    try:
+        post = Post(
+            number=body.get("number"),
+            name=body.get("name"),
+            ip_address=body.get("ip_address"),
+            is_active=body.get("is_active", True),
+        )
+        db.add(post)
+        db.commit()
+        db.refresh(post)
+        return {"id": post.id, "number": post.number, "name": post.name}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
