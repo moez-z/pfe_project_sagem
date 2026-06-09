@@ -3,7 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy DB layer first
-COPY ../db ./db
+COPY db ./db
 
 # Copy API
 COPY api/requirements.txt .
