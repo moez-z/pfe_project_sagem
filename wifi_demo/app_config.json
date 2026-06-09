@@ -1,12 +1,12 @@
 {
-  "post_number": 1,
-  "post_id": 1,
-  "post_name": "Caisson 1",
-  "configured": true,
-  "db_host": "192.168.56.1",
+  "post_number": null,
+  "post_id": null,
+  "post_name": null,
+  "configured": false,
+  "db_host": "dpg-d8jijju47okc73a8rl30-a.frankfurt-postgres.render.com",
   "db_port": 5432,
   "db_name": "wifi_calibration",
-  "db_user": "postgres",
-  "db_password": "okokok",
+  "db_user": "wifi_calibration_user",
+  "db_password": "JqF1p4oKQ3GtGz2Ay86ip9UFw2r1A4Vf",
   "dark_mode": false
 }

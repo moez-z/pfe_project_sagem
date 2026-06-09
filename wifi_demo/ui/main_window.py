@@ -1,4 +1,5 @@
 import sys
+import requests
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QStackedWidget,
@@ -485,17 +486,20 @@ class MainWindow(QMainWindow):
 
 
 def run_app():
-    import os, requests
+    import os
     app = QApplication(sys.argv)
     app.setStyleSheet(APP_STYLE)
 
-    API_URL = os.environ.get("API_URL", "http://localhost:8000")
+    API_URL = os.environ.get("API_URL", "https://wifi-calibration-api.onrender.com")
 
     user    = None
     api_url = None
 
     try:
-        r = requests.get(f"{API_URL}/health", timeout=5)
+       
+        QMessageBox.information(None, "Connecting...", 
+            "Connecting to server, please wait...\n(First connection may take ~30 seconds)")
+        r = requests.get(f"{API_URL}/health", timeout=30)
         if r.status_code == 200:
             api_url = API_URL
             from ui.login_dialog import LoginDialog
