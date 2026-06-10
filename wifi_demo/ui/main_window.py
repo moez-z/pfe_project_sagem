@@ -141,7 +141,7 @@ class MainWindow(QMainWindow):
         logo.setObjectName("logo_label")
         lay.addWidget(logo)
 
-        self._product_lbl = QLabel("EDERSON")
+        
         self._product_lbl.setObjectName("product_label")
         lay.addWidget(self._product_lbl)
 
