@@ -31,40 +31,38 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         matricule: { label: "Matricule", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        if (!credentials?.matricule || !credentials?.password) return null;
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
-        try {
-          const res = await fetch(
-            `${process.env.API_URL}/auth/login`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                matricule: credentials.matricule,
-                password: credentials.password,
-              }),
-              signal: controller.signal,
-            },
-          );
-          clearTimeout(timeout);
+   async authorize(credentials) {
+    if (!credentials?.matricule || !credentials?.password) return null;
 
-          if (!res.ok) return null;
+    try {
+      console.log("[AUTH] Calling API:", process.env.API_URL);
+      const res = await fetch(`${process.env.API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matricule: credentials.matricule,
+          password: credentials.password,
+        }),
+      });
 
-          const user = await res.json();
-          if (user.role?.toLowerCase() !== "admin") return null;
+      console.log("[AUTH] Response status:", res.status);
+      const data = await res.json();
+      console.log("[AUTH] Response data:", JSON.stringify(data));
 
-          return {
-            id: String(user.id),
-            name: user.full_name,
-            email: user.matricule,
-            role: user.role,
-          };
-        } catch {
-          return null;
-        }
-      },
+      if (!res.ok) return null;
+      if (data.role?.toLowerCase() !== "admin") return null;
+
+      return {
+        id: String(data.id),
+        name: data.full_name,
+        email: data.matricule,
+        role: data.role,
+      };
+    } catch (e) {
+      console.error("[AUTH] Error:", e);
+      return null;
+    }
+  },
     }),
   ],
 });
