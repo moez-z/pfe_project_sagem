@@ -31,38 +31,38 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         matricule: { label: "Matricule", type: "text" },
         password: { label: "Password", type: "password" },
       },
-   async authorize(credentials) {
-    if (!credentials?.matricule || !credentials?.password) return null;
+      async authorize(credentials) {
+        if (!credentials?.matricule || !credentials?.password) return null;
 
-    try {
-      console.log("[AUTH] Calling API:", process.env.API_URL);
-      const res = await fetch(`${process.env.API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          matricule: credentials.matricule,
-          password: credentials.password,
-        }),
-      });
+        try {
+          console.log("[AUTH] Calling API:", process.env.API_URL);
+          const res = await fetch(`${process.env.API_URL}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              matricule: credentials.matricule,
+              password: credentials.password,
+            }),
+          });
 
-      console.log("[AUTH] Response status:", res.status);
-      const data = await res.json();
-      console.log("[AUTH] Response data:", JSON.stringify(data));
+          console.log("[AUTH] Response status:", res.status);
+          const data = await res.json();
+          console.log("[AUTH] Response data:", JSON.stringify(data));
 
-      if (!res.ok) return null;
-      if (data.role?.toLowerCase() !== "admin") return null;
+          if (!res.ok) return null;
+          if (data.role?.toLowerCase() !== "admin") return null;
 
-      return {
-        id: String(data.id),
-        name: data.full_name,
-        email: data.matricule,
-        role: data.role,
-      };
-    } catch (e) {
-      console.error("[AUTH] Error:", e);
-      return null;
-    }
-  },
+          return {
+            id: String(data.id),
+            name: data.full_name,
+            matricule: data.matricule,
+            role: data.role,
+          };
+        } catch (e) {
+          console.error("[AUTH] Error:", e);
+          return null;
+        }
+      },
     }),
   ],
 });

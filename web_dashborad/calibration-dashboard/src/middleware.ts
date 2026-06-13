@@ -9,6 +9,10 @@ export async function middleware(req: NextRequest) {
     secret: process.env.AUTH_SECRET,
   });
 
+  console.log("[MIDDLEWARE] Path:", pathname);
+  console.log("[MIDDLEWARE] Token:", JSON.stringify(token));
+  console.log("[MIDDLEWARE] AUTH_SECRET exists:", !!process.env.AUTH_SECRET);
+
   const isLoggedIn = !!token;
   const isAdmin = (token?.role as string)?.toLowerCase() === "admin";
 
