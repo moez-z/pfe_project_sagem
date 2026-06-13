@@ -8,6 +8,7 @@ export async function middleware(req: NextRequest) {
     req,
     secret: process.env.AUTH_SECRET,
     cookieName: "authjs.session-token", 
+    salt: "authjs.session-token",
   });
 
   console.log("[MIDDLEWARE] Path:", pathname);
