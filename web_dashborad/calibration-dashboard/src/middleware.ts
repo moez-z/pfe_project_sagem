@@ -7,6 +7,7 @@ export async function middleware(req: NextRequest) {
   const token = await getToken({
     req,
     secret: process.env.AUTH_SECRET,
+    cookieName: "authjs.session-token", 
   });
 
   console.log("[MIDDLEWARE] Path:", pathname);
