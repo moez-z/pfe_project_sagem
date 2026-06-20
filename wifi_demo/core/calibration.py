@@ -388,12 +388,22 @@ class CalibrationEngine:
                 )
 
         # Determine status
+        # Priority:
+        #   1. Outside hard power limits → FAIL (hard failure, no matter the delta)
+        #   2. Within hard limits but delta > tolerance → NEEDS_CORRECTION (calibration drift)
+        #   3. Within hard limits and delta OK → PASS
+        #   4. No hard limits, delta > tolerance → NEEDS_CORRECTION
+        #   5. No hard limits, delta OK → OK
+        #   6. No delta available → NO_LIMIT
         if dut.has_limits and dut.tx_measured_dbm is not None:
-            # Hard limits present in the log
-            if dut.passes_limits:
-                res.status = TxStatus.PASS
-            else:
+            if not dut.passes_limits:
+                # Outside power limits → hard FAIL regardless of delta
                 res.status = TxStatus.FAIL
+            elif res.delta_dbm is not None and abs(res.delta_dbm) > tolerance:
+                # Within power limits but drifted too far from origin → flag for correction
+                res.status = TxStatus.NEEDS_CORRECTION
+            else:
+                res.status = TxStatus.PASS
         elif res.delta_dbm is not None:
             # No hard limits — use tolerance on delta
             if abs(res.delta_dbm) > tolerance:
@@ -506,5 +516,3 @@ class CalibrationEngine:
                     "warning":          r.warning,
                 })
         return corrections
-
-   
