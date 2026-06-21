@@ -1,8 +1,8 @@
 {
-  "post_number": null,
-  "post_id": null,
-  "post_name": null,
-  "configured": false,
+  "post_number": 1,
+  "post_id": 1,
+  "post_name": "post 1",
+  "configured": true,
   "db_host": "dpg-d8jijju47okc73a8rl30-a.frankfurt-postgres.render.com",
   "db_port": 5432,
   "db_name": "wifi_calibration",
