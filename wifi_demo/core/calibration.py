@@ -22,8 +22,14 @@ MAX_CORRECTION_DBM = 5.0
 # ---------------------------------------------------------------------------
 
 class TxStatus(Enum):
+<<<<<<< HEAD
     FAIL          = "FAIL"           # Unused — TX is always correctable, never a hard fail
     NEEDS_CORRECTION = "NEEDS_CORRECTION"  # Delta > tolerance, or outside hard limits
+=======
+    PASS          = "PASS"           # Measured within limits
+    FAIL          = "FAIL"           # Measured outside limits
+    NEEDS_CORRECTION = "NEEDS_CORRECTION"  # Delta > tolerance (no hard limits)
+>>>>>>> origin/main
     OK            = "OK"             # Delta within tolerance (no hard limits)
     NO_LIMIT      = "NO_LIMIT"       # No limits defined, delta acceptable
     UNMATCHED     = "UNMATCHED"      # No corresponding block in origin
@@ -160,7 +166,11 @@ class CalibrationReport:
     # --- TX summary ---
     @property
     def tx_pass_count(self) -> int:
+<<<<<<< HEAD
         return sum(1 for r in self.tx_results if r.status == TxStatus.OK)
+=======
+        return sum(1 for r in self.tx_results if r.status == TxStatus.PASS)
+>>>>>>> origin/main
 
     @property
     def tx_fail_count(self) -> int:
@@ -377,7 +387,11 @@ class CalibrationEngine:
         if dut.tx_measured_dbm is not None and origin.tx_measured_dbm is not None:
             delta = round(dut.tx_measured_dbm - origin.tx_measured_dbm, 4)
             res.delta_dbm = delta
+<<<<<<< HEAD
             res.correction_dbm = round(-delta/2, 4)
+=======
+            res.correction_dbm = round(-(delta / 2), 4)
+>>>>>>> origin/main
 
             # Sanity check — huge delta means hardware issue
             if abs(delta) > MAX_CORRECTION_DBM:
@@ -387,17 +401,35 @@ class CalibrationEngine:
                 )
 
         # Determine status
+<<<<<<< HEAD
         if dut.has_limits and dut.tx_measured_dbm is not None:
             # Hard limits present in the log
             if not dut.passes_limits:
                 # Outside power limits, but TX is always correctable via
                 # EEPROM offset — never a hard FAIL, just needs correction.
                 res.status = TxStatus.NEEDS_CORRECTION
+=======
+        # Priority:
+        #   1. Outside hard power limits → FAIL (hard failure, no matter the delta)
+        #   2. Within hard limits but delta > tolerance → NEEDS_CORRECTION (calibration drift)
+        #   3. Within hard limits and delta OK → PASS
+        #   4. No hard limits, delta > tolerance → NEEDS_CORRECTION
+        #   5. No hard limits, delta OK → OK
+        #   6. No delta available → NO_LIMIT
+        if dut.has_limits and dut.tx_measured_dbm is not None:
+            if not dut.passes_limits:
+                # Outside power limits → hard FAIL regardless of delta
+                res.status = TxStatus.FAIL
+>>>>>>> origin/main
             elif res.delta_dbm is not None and abs(res.delta_dbm) > tolerance:
                 # Within power limits but drifted too far from origin → flag for correction
                 res.status = TxStatus.NEEDS_CORRECTION
             else:
+<<<<<<< HEAD
                 res.status = TxStatus.OK
+=======
+                res.status = TxStatus.PASS
+>>>>>>> origin/main
         elif res.delta_dbm is not None:
             # No hard limits — use tolerance on delta
             if abs(res.delta_dbm) > tolerance:

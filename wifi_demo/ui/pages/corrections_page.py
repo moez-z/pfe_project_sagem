@@ -27,8 +27,11 @@ try:
 except ImportError:
     _PATH_LOSS_AVAILABLE = False
 
+<<<<<<< HEAD
 from core.path_loss_validator import PathLossValidator, PathLossValidationError
 
+=======
+>>>>>>> origin/main
 
 # ---------------------------------------------------------------------------
 # Column layout  (checkbox added as first column)
@@ -88,13 +91,19 @@ class CorrectionsPage(QWidget):
     """Corrections page widget."""
 
     correction_applied = pyqtSignal(dict)
+<<<<<<< HEAD
     path_loss_loaded    = pyqtSignal(str)   # absolute path, emitted after a
                                              # successful load from this page
+=======
+>>>>>>> origin/main
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._corrections: list[dict] = []
+<<<<<<< HEAD
         self._tolerance: float = 0.5
+=======
+>>>>>>> origin/main
         self._path_loss_table: Optional["PathLossTable"] = None
         self._path_loss_path: str = ""
         self._applied: dict[str, bool] = {}
@@ -151,11 +160,14 @@ class CorrectionsPage(QWidget):
         self._export_btn.clicked.connect(self._export_csv)
         info_row.addWidget(self._export_btn)
 
+<<<<<<< HEAD
         self._refresh_btn = QPushButton("⟲  Refresh")
         self._refresh_btn.setFixedHeight(32)
         self._refresh_btn.clicked.connect(self.refresh)
         info_row.addWidget(self._refresh_btn)
 
+=======
+>>>>>>> origin/main
         root.addLayout(info_row)
 
         # ── Selection action row ─────────────────────────────────────────────
@@ -239,7 +251,10 @@ class CorrectionsPage(QWidget):
 
     def load_corrections(self, corrections: list[dict], tolerance: float) -> None:
         self._corrections = corrections
+<<<<<<< HEAD
         self._tolerance = tolerance
+=======
+>>>>>>> origin/main
         self._applied.clear()
         self._select_all_state = False
         self._select_all_btn.setText("☐  Select All")
@@ -249,6 +264,7 @@ class CorrectionsPage(QWidget):
         self._export_btn.setEnabled(bool(corrections))
         self._update_selection_label()
 
+<<<<<<< HEAD
     def refresh(self) -> None:
         """Re-render the table/summary from the last loaded corrections."""
         self._populate_table(self._corrections)
@@ -256,6 +272,8 @@ class CorrectionsPage(QWidget):
         self._build_summary(self._corrections, self._tolerance)
         self._update_selection_label()
 
+=======
+>>>>>>> origin/main
     def set_path_loss_file(self, filepath: str) -> None:
         self._do_load_path_loss(filepath)
 
@@ -332,6 +350,7 @@ class CorrectionsPage(QWidget):
                 "Make sure core/path_loss.py exists.",
             )
             return
+<<<<<<< HEAD
 
         # Guard against a cross-page signal loop: if this exact file is
         # already the one loaded here, skip re-loading/re-emitting.
@@ -354,6 +373,8 @@ class CorrectionsPage(QWidget):
                 f"{warn_txt}"
             )
 
+=======
+>>>>>>> origin/main
         try:
             table = PathLossTable.load(path)
         except Exception as exc:
@@ -372,10 +393,13 @@ class CorrectionsPage(QWidget):
         self._pl_btn.setText(f"📂 {fname}")
         self._refresh_note_buttons()
 
+<<<<<<< HEAD
         # Notify other pages (e.g. PathLossPage) that a path-loss file was
         # loaded from here, so the viewer can mirror it automatically.
         self.path_loss_loaded.emit(path)
 
+=======
+>>>>>>> origin/main
     # -----------------------------------------------------------------------
     # Table population
     # -----------------------------------------------------------------------

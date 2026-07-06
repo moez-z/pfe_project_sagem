@@ -31,7 +31,10 @@ from PyQt6.QtGui import QFont, QColor, QDragEnterEvent, QDropEvent
 
 from ui import styles
 from ui.widgets import MetricCard
+<<<<<<< HEAD
 from core.path_loss_validator import PathLossValidator, PathLossValidationError
+=======
+>>>>>>> origin/main
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +153,7 @@ class PathLossPage(QWidget):
         self._browse_btn.clicked.connect(self._browse)
         toolbar.addWidget(self._browse_btn)
 
+<<<<<<< HEAD
         self._refresh_btn = QPushButton("🔄  Refresh")
         self._refresh_btn.setFixedHeight(34)
         self._refresh_btn.setEnabled(False)
@@ -160,6 +164,8 @@ class PathLossPage(QWidget):
         self._refresh_btn.clicked.connect(self._refresh)
         toolbar.addWidget(self._refresh_btn)
 
+=======
+>>>>>>> origin/main
         self._save_btn = QPushButton("💾  Save")
         self._save_btn.setFixedHeight(34)
         self._save_btn.setEnabled(False)
@@ -333,6 +339,7 @@ class PathLossPage(QWidget):
         """Public API — load a file programmatically."""
         self._load_file(path)
 
+<<<<<<< HEAD
     def _load_file(self, path: str, _silent: bool = False) -> None:
         """
         Parse and display the CSV.
@@ -372,6 +379,10 @@ class PathLossPage(QWidget):
                 f"{warn_txt}"
             )
 
+=======
+    def _load_file(self, path: str) -> None:
+        """Parse and display the CSV."""
+>>>>>>> origin/main
         rows: list[dict] = []
         warnings: list[str] = []
 
@@ -416,6 +427,7 @@ class PathLossPage(QWidget):
                     })
 
         except Exception as exc:
+<<<<<<< HEAD
             if not _silent:
                 QMessageBox.critical(self, "Load error",
                                      f"Could not read file:\n{exc}")
@@ -427,6 +439,17 @@ class PathLossPage(QWidget):
                     self, "Empty file",
                     "The selected CSV contains no valid data rows."
                 )
+=======
+            QMessageBox.critical(self, "Load error",
+                                 f"Could not read file:\n{exc}")
+            return
+
+        if not rows:
+            QMessageBox.warning(
+                self, "Empty file",
+                "The selected CSV contains no valid data rows."
+            )
+>>>>>>> origin/main
             return
 
         self._filepath = path
@@ -452,6 +475,7 @@ class PathLossPage(QWidget):
             f"Loaded: {path}  •  {n} entr{'y' if n == 1 else 'ies'}{warn_txt}"
         )
 
+<<<<<<< HEAD
         # Notify other pages (skip on a silent internal refresh to avoid
         # re-triggering CorrectionsPage's own loader in a loop)
         if not _silent:
@@ -493,6 +517,10 @@ class PathLossPage(QWidget):
         if not self._filepath:
             return
         self._load_file(self._filepath, _silent=True)
+=======
+        # Notify other pages
+        self.file_loaded.emit(path)
+>>>>>>> origin/main
 
     def _save(self) -> None:
         """Flush table edits back to self._rows then write to CSV."""
@@ -534,6 +562,16 @@ class PathLossPage(QWidget):
     def _write_csv(self, path: str) -> None:
         with open(path, "w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
+<<<<<<< HEAD
+=======
+            writer.writerow([
+                "# path_loss.csv",
+            ])
+            writer.writerow([
+                "# freq_mhz", "loss_ant1(dB)", "loss_ant2(dB)",
+                "loss_ant3(dB)", "loss_ant4(dB)"
+            ])
+>>>>>>> origin/main
             for r in sorted(self._rows, key=lambda x: x["freq"]):
                 writer.writerow([
                     r["freq"],
@@ -730,7 +768,10 @@ class PathLossPage(QWidget):
         self._export_btn.setEnabled(enabled)
         self._add_btn.setEnabled(enabled)
         self._del_btn.setEnabled(enabled)
+<<<<<<< HEAD
         self._refresh_btn.setEnabled(enabled)
+=======
+>>>>>>> origin/main
 
     # -----------------------------------------------------------------------
     # Public helpers
@@ -746,4 +787,8 @@ class PathLossPage(QWidget):
 # ---------------------------------------------------------------------------
 
 def _fmt(val: Optional[float]) -> str:
+<<<<<<< HEAD
     return f"{val:.2f}" if val is not None else ""
+=======
+    return f"{val:.2f}" if val is not None else ""
+>>>>>>> origin/main

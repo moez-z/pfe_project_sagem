@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
 """
 pages/dashboard.py
 ------------------
@@ -20,7 +24,10 @@ class DashboardPage(QWidget):
     run_requested = pyqtSignal(str, str, float)
     def __init__(self, parent=None):
         super().__init__(parent)
+<<<<<<< HEAD
         self._last_report = None
+=======
+>>>>>>> origin/main
         self._build_ui()
     def _build_ui(self):
         root = QVBoxLayout(self)
@@ -90,6 +97,7 @@ class DashboardPage(QWidget):
         self._banner = _ResultBanner()
         root.addWidget(self._banner)
         # ── Metric cards ──────────────────────────────────────────────────────
+<<<<<<< HEAD
         summary_header_row = QHBoxLayout()
         summary_header_row.addWidget(SectionHeader("Calibration Summary"))
         summary_header_row.addStretch()
@@ -98,6 +106,9 @@ class DashboardPage(QWidget):
         self._refresh_btn.clicked.connect(self.refresh)
         summary_header_row.addWidget(self._refresh_btn)
         root.addLayout(summary_header_row)
+=======
+        root.addWidget(SectionHeader("Calibration Summary"))
+>>>>>>> origin/main
         cards_row = QHBoxLayout()
         cards_row.setSpacing(10)
         self._c_tx_total = MetricCard("TX BLOCKS",    "—", "total parsed",
@@ -166,6 +177,7 @@ class DashboardPage(QWidget):
             return
         self.run_requested.emit(origin, dut, tol)
     def update_report(self, report):
+<<<<<<< HEAD
         self._last_report = report
         self._render_report(report)
 
@@ -179,6 +191,8 @@ class DashboardPage(QWidget):
             )
 
     def _render_report(self, report):
+=======
+>>>>>>> origin/main
         self._c_tx_total.set_value(str(len(report.tx_results)))
         self._c_tx_pass.set_value(str(report.tx_pass_count))
         self._c_tx_fail.set_value(str(report.tx_fail_count))
@@ -192,7 +206,11 @@ class DashboardPage(QWidget):
         self._c_dut_sn.set_value(report.dut_serial[:12] or "—")
         self._c_dut_sn.set_sub(report.dut_serial[12:] or "")
         self._c_origin_sn.set_value(report.origin_serial[:12] or "—")
+<<<<<<< HEAD
         self._banner.set_result(report)
+=======
+        self._banner.set_result(report.overall_pass)
+>>>>>>> origin/main
         warnings_text = "\\n".join(report.warnings) if report.warnings else "No warnings."
         self._console.setPlainText(
             f"✓  Parsed {len(report.tx_results)} TX blocks, "
@@ -214,6 +232,7 @@ class _ResultBanner(QWidget):
         lay.addWidget(self._icon)
         lay.addWidget(self._text)
         lay.addStretch()
+<<<<<<< HEAD
         self._set_style("idle")
     def set_result(self, report):
         """
@@ -258,9 +277,31 @@ class _ResultBanner(QWidget):
             # Blue accent — matches the "CORR" status cells, not red
             bg, border, fg = styles.cell_bg_warn(), styles.ACCENT_DARK, styles.cell_color_warn()
         else:  # "fail" — real hard-limit failure → red
+=======
+        self._set_style(None)
+    def set_result(self, passed: bool):
+        self._set_style(passed)
+        if passed:
+            self._text.setText("OVERALL RESULT:  PASS  — No corrections required")
+        else:
+            self._text.setText("OVERALL RESULT:  ❌  FAIL / CORRECTION NEEDED")
+    def _set_style(self, passed):
+        if passed is None:
+            # Blue default state (was grey)
+            bg     = styles.ACCENT_DIM    # #042A50
+            border = styles.ACCENT_DARK   # #025091
+            fg     = styles.ACCENT        # #71C5EE
+        elif passed:
+            bg, border, fg = styles.C_PASS_BG, styles.C_PASS, styles.C_PASS
+        else:
+>>>>>>> origin/main
             bg, border, fg = styles.C_FAIL_BG, styles.C_FAIL, styles.C_FAIL
         self.setStyleSheet(
             f"background-color: {bg}; border: 1px solid {border};"
         )
         self._icon.setStyleSheet(f"color: {fg};")
+<<<<<<< HEAD
         self._text.setStyleSheet(f"color: {fg};")
+=======
+        self._text.setStyleSheet(f"color: {fg};")
+>>>>>>> origin/main

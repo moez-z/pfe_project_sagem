@@ -192,6 +192,7 @@ class ParsedLog:
     rx_blocks: list = field(default_factory=list)   # list[RxBlock]
     parse_warnings: list = field(default_factory=list)  # list[str]
 
+<<<<<<< HEAD
     # --- Block headers that were detected but rejected (null/missing data) ---
     # Populated by LogParser when a "N.TX_VERIFY ..." or "N.RX_VERIFY ..."
     # header is found but the required measurement is missing or null.
@@ -206,6 +207,8 @@ class ParsedLog:
     skipped_tx_blocks: list = field(default_factory=list)
     skipped_rx_blocks: list = field(default_factory=list)
 
+=======
+>>>>>>> origin/main
     @property
     def tx_count(self) -> int:
         return len(self.tx_blocks)
@@ -218,4 +221,8 @@ class ParsedLog:
         return [b for b in self.tx_blocks if b.band == band]
 
     def rx_by_band(self, band: Band) -> list:
+<<<<<<< HEAD
         return [b for b in self.rx_blocks if b.band == band]
+=======
+        return [b for b in self.rx_blocks if b.band == band]
+>>>>>>> origin/main

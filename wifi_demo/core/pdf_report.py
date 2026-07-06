@@ -30,6 +30,10 @@ try:
         SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
         HRFlowable, KeepTogether,
     )
+<<<<<<< HEAD
+=======
+    from reportlab.platypus.flowables import HRFlowable
+>>>>>>> origin/main
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
@@ -52,6 +56,7 @@ C_BLACK     = colors.black
 C_GRAY      = colors.HexColor("#6C7A8A")
 
 
+<<<<<<< HEAD
 def _scale_col_widths(cw_list: list[float], available_width_mm: float = 170) -> list[float]:
     """Scale column widths (in mm units) proportionally to fit available space."""
     total = sum(cw_list)
@@ -61,6 +66,8 @@ def _scale_col_widths(cw_list: list[float], available_width_mm: float = 170) -> 
     return [w * scale for w in cw_list]
 
 
+=======
+>>>>>>> origin/main
 class PdfReport:
 
     @staticmethod
@@ -72,6 +79,20 @@ class PdfReport:
     ) -> str:
         """
         Generate a PDF report from a CalibrationReport.
+<<<<<<< HEAD
+=======
+
+        Parameters
+        ----------
+        report      : CalibrationReport
+        output_path : where to write the .pdf file
+        operator    : name of the logged-in user
+        session_id  : DB session ID (shown in header)
+
+        Returns
+        -------
+        str : absolute path to the written file
+>>>>>>> origin/main
         """
         if not REPORTLAB_AVAILABLE:
             raise ImportError(
@@ -82,6 +103,7 @@ class PdfReport:
         output_path = str(output_path)
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
+<<<<<<< HEAD
         # Calculate usable width (A4 = 210mm, margins = 36mm total)
         available_width_mm = (A4[0] / mm - 36)   # ≈ 174 mm
 
@@ -96,6 +118,17 @@ class PdfReport:
 
         styles = _make_styles()
         story = []
+=======
+        doc = SimpleDocTemplate(
+            output_path,
+            pagesize=A4,
+            leftMargin=18*mm, rightMargin=18*mm,
+            topMargin=18*mm,  bottomMargin=18*mm,
+        )
+
+        styles = _make_styles()
+        story  = []
+>>>>>>> origin/main
 
         # ── Cover header ──────────────────────────────────────────────────────
         story += _build_header(report, operator, session_id, styles)
@@ -112,13 +145,21 @@ class PdfReport:
         # ── TX Calibration results ─────────────────────────────────────────────
         story.append(Paragraph("TX Calibration Results", styles["section"]))
         story.append(Spacer(1, 2*mm))
+<<<<<<< HEAD
         story += _build_tx_table(report, styles, available_width_mm)
+=======
+        story += _build_tx_table(report, styles)
+>>>>>>> origin/main
         story.append(Spacer(1, 6*mm))
 
         # ── RX Comparison results ──────────────────────────────────────────────
         story.append(Paragraph("RX Comparison Results", styles["section"]))
         story.append(Spacer(1, 2*mm))
+<<<<<<< HEAD
         story += _build_rx_table(report, styles, available_width_mm)
+=======
+        story += _build_rx_table(report, styles)
+>>>>>>> origin/main
         story.append(Spacer(1, 6*mm))
 
         # ── Corrections needed ────────────────────────────────────────────────
@@ -127,7 +168,11 @@ class PdfReport:
         if corrections:
             story.append(Paragraph("EEPROM Corrections Required", styles["section_warn"]))
             story.append(Spacer(1, 2*mm))
+<<<<<<< HEAD
             story += _build_corrections_table(corrections, styles, available_width_mm)
+=======
+            story += _build_corrections_table(corrections, styles)
+>>>>>>> origin/main
         else:
             story.append(Paragraph(
                 "No EEPROM corrections required at the configured tolerance.",
@@ -166,7 +211,15 @@ def _make_styles() -> dict:
             textColor=C_GRAY, spaceAfter=2),
         "section": ps("section",
             fontSize=11, fontName="Helvetica-Bold",
+<<<<<<< HEAD
             textColor=C_DARK, spaceAfter=2),
+=======
+            textColor=C_DARK,
+            borderPad=4, borderWidth=0,
+            borderColor=C_ACCENT,
+            leftIndent=0, spaceAfter=2,
+        ),
+>>>>>>> origin/main
         "section_warn": ps("section_warn",
             fontSize=11, fontName="Helvetica-Bold",
             textColor=C_WARN, spaceAfter=2),
@@ -216,6 +269,7 @@ def _build_header(report, operator, session_id, styles) -> list:
 
 def _build_result_banner(report, styles) -> list:
     if report.overall_pass:
+<<<<<<< HEAD
         text = "OVERALL RESULT:  PASS  — No corrections required"
         bg = colors.HexColor("#0D2A1A")
         fg = C_PASS
@@ -223,12 +277,26 @@ def _build_result_banner(report, styles) -> list:
         text = "OVERALL RESULT:  FAIL / CORRECTION NEEDED"
         bg = colors.HexColor("#2A0D0D")
         fg = C_FAIL
+=======
+        text  = "OVERALL RESULT:  PASS  — No corrections required"
+        bg    = colors.HexColor("#0D2A1A")
+        fg    = C_PASS
+    else:
+        text  = "OVERALL RESULT:  FAIL / CORRECTION NEEDED"
+        bg    = colors.HexColor("#2A0D0D")
+        fg    = C_FAIL
+>>>>>>> origin/main
 
     style = ParagraphStyle("banner",
         fontSize=12, fontName="Helvetica-Bold",
         textColor=fg, alignment=TA_CENTER)
 
+<<<<<<< HEAD
     t = Table([[Paragraph(text, style)]], colWidths=["100%"])
+=======
+    t = Table([[Paragraph(text, style)]],
+              colWidths=["100%"])
+>>>>>>> origin/main
     t.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,-1), bg),
         ("TOPPADDING",    (0,0), (-1,-1), 8),
@@ -242,6 +310,12 @@ def _build_summary_table(report, styles) -> list:
     hdr_style = ParagraphStyle("sh",
         fontSize=8, fontName="Helvetica-Bold",
         textColor=C_WHITE, alignment=TA_CENTER)
+<<<<<<< HEAD
+=======
+    val_style = ParagraphStyle("sv",
+        fontSize=11, fontName="Courier-Bold",
+        textColor=C_DARK, alignment=TA_CENTER)
+>>>>>>> origin/main
     lbl_style = ParagraphStyle("sl",
         fontSize=7, fontName="Helvetica",
         textColor=C_GRAY, alignment=TA_CENTER)
@@ -255,7 +329,11 @@ def _build_summary_table(report, styles) -> list:
         ]
 
     avg = f"{report.tx_avg_delta:+.3f}" if report.tx_avg_delta is not None else "—"
+<<<<<<< HEAD
     mx = f"{report.tx_max_delta:.3f}" if report.tx_max_delta is not None else "—"
+=======
+    mx  = f"{report.tx_max_delta:.3f}"  if report.tx_max_delta  is not None else "—"
+>>>>>>> origin/main
 
     data = [[
         cell("TX BLOCKS",     len(report.tx_results)),
@@ -281,7 +359,11 @@ def _build_summary_table(report, styles) -> list:
     return [t]
 
 
+<<<<<<< HEAD
 def _build_tx_table(report, styles, available_width_mm: float) -> list:
+=======
+def _build_tx_table(report, styles) -> list:
+>>>>>>> origin/main
     col_hdr = ["Band", "Blk", "Freq", "Mod", "BW", "Ant",
                "Origin dBm", "DUT dBm", "Delta", "Correction", "Limits", "Status"]
 
@@ -300,10 +382,17 @@ def _build_tx_table(report, styles, available_width_mm: float) -> list:
         band_style = ParagraphStyle("_b", fontSize=7, fontName="Helvetica-Bold",
                                     textColor=bc, alignment=TA_CENTER)
         orig = f"{r.origin_measured_dbm:.2f}" if r.origin_measured_dbm is not None else "—"
+<<<<<<< HEAD
         dut = f"{r.dut_measured_dbm:.2f}" if r.dut_measured_dbm is not None else "—"
         dlt = f"{r.delta_dbm:+.3f}" if r.delta_dbm is not None else "—"
         cor = f"{r.correction_dbm:+.3f}" if r.correction_dbm is not None else "—"
         lim = r.limits_str
+=======
+        dut  = f"{r.dut_measured_dbm:.2f}"    if r.dut_measured_dbm  is not None else "—"
+        dlt  = (f"{r.delta_dbm:+.3f}" if r.delta_dbm is not None else "—")
+        cor  = (f"{r.correction_dbm:+.3f}" if r.correction_dbm is not None else "—")
+        lim  = r.limits_str
+>>>>>>> origin/main
 
         s = r.status.value
         if "PASS" in s or s == "OK":
@@ -333,9 +422,13 @@ def _build_tx_table(report, styles, available_width_mm: float) -> list:
         ])
 
     cw = [30, 18, 34, 34, 28, 22, 38, 38, 36, 40, 46, 50]
+<<<<<<< HEAD
     scaled_cw = _scale_col_widths(cw, available_width_mm)
     t = Table(rows, colWidths=[c * mm for c in scaled_cw], repeatRows=1)
 
+=======
+    t = Table(rows, colWidths=[c*mm for c in cw], repeatRows=1)
+>>>>>>> origin/main
     t.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,0),  C_HEADER_BG),
         ("ROWBACKGROUNDS",(0,1), (-1,-1), [C_WHITE, C_ROW_ALT]),
@@ -348,10 +441,16 @@ def _build_tx_table(report, styles, available_width_mm: float) -> list:
     return [t]
 
 
+<<<<<<< HEAD
 def _build_rx_table(report, styles, available_width_mm: float) -> list:
     col_hdr = ["Band", "Blk", "Freq", "MCS", "BW", "Ant",
                "Orig RSSI", "DUT RSSI", "Δ RSSI", "PER %", "Status"]
 
+=======
+def _build_rx_table(report, styles) -> list:
+    col_hdr = ["Band", "Blk", "Freq", "MCS", "BW", "Ant",
+               "Orig RSSI", "DUT RSSI", "Δ RSSI", "PER %", "Status"]
+>>>>>>> origin/main
     hdr_style = ParagraphStyle("_rth", fontSize=7, fontName="Helvetica-Bold",
                                textColor=C_WHITE, alignment=TA_CENTER)
     row_style = ParagraphStyle("_rtd", fontSize=7, fontName="Courier",
@@ -365,15 +464,24 @@ def _build_rx_table(report, styles, available_width_mm: float) -> list:
         bst = ParagraphStyle("_rb", fontSize=7, fontName="Helvetica-Bold",
                              textColor=bc, alignment=TA_CENTER)
         orig_rssi = f"{r.origin_rssi:.1f}" if r.origin_rssi and r.origin_rssi != -999 else "N/A"
+<<<<<<< HEAD
         dut_rssi = f"{r.dut_rssi:.1f}" if r.dut_rssi and r.dut_rssi != -999 else "N/A"
         delta_r = f"{r.rssi_delta:+.1f}" if r.rssi_delta is not None else "—"
         per = f"{r.dut_per:.2f}" if r.dut_per is not None else "—"
+=======
+        dut_rssi  = f"{r.dut_rssi:.1f}"   if r.dut_rssi  and r.dut_rssi  != -999 else "N/A"
+        delta_r   = f"{r.rssi_delta:+.1f}" if r.rssi_delta is not None else "—"
+        per       = f"{r.dut_per:.2f}"     if r.dut_per  is not None else "—"
+>>>>>>> origin/main
 
         s = r.status.value
         sc = C_PASS if "PASS" in s else (C_FAIL if "FAIL" in s else C_GRAY)
         sst = ParagraphStyle("_rs", fontSize=7, fontName="Helvetica-Bold",
                              textColor=sc, alignment=TA_CENTER)
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/main
         rows.append([
             Paragraph(band_val, bst),
             Paragraph(str(r.block_number), row_style),
@@ -389,9 +497,13 @@ def _build_rx_table(report, styles, available_width_mm: float) -> list:
         ])
 
     cw = [30, 18, 34, 28, 28, 30, 40, 40, 36, 30, 50]
+<<<<<<< HEAD
     scaled_cw = _scale_col_widths(cw, available_width_mm)
     t = Table(rows, colWidths=[c * mm for c in scaled_cw], repeatRows=1)
 
+=======
+    t = Table(rows, colWidths=[c*mm for c in cw], repeatRows=1)
+>>>>>>> origin/main
     t.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,0),  C_HEADER_BG),
         ("ROWBACKGROUNDS",(0,1), (-1,-1), [C_WHITE, C_ROW_ALT]),
@@ -404,10 +516,16 @@ def _build_rx_table(report, styles, available_width_mm: float) -> list:
     return [t]
 
 
+<<<<<<< HEAD
 def _build_corrections_table(corrections: list, styles, available_width_mm: float) -> list:
     col_hdr = ["Band", "Block", "Freq", "Mod", "BW", "Ant",
                "Origin dBm", "DUT dBm", "Delta", "Correction to apply"]
 
+=======
+def _build_corrections_table(corrections: list, styles) -> list:
+    col_hdr = ["Band", "Block", "Freq", "Mod", "BW", "Ant",
+               "Origin dBm", "DUT dBm", "Delta", "Correction to apply"]
+>>>>>>> origin/main
     hdr_style = ParagraphStyle("_cth", fontSize=7, fontName="Helvetica-Bold",
                                textColor=C_WHITE, alignment=TA_CENTER)
     row_style = ParagraphStyle("_ctd", fontSize=7, fontName="Courier",
@@ -418,6 +536,7 @@ def _build_corrections_table(corrections: list, styles, available_width_mm: floa
     rows = [[Paragraph(h, hdr_style) for h in col_hdr]]
     for c in corrections:
         rows.append([
+<<<<<<< HEAD
             Paragraph(c.get("band", ""), row_style),
             Paragraph(str(c.get("label", "")).split(".")[0], row_style),
             Paragraph(str(c.get("freq_mhz", "")), row_style),
@@ -434,6 +553,22 @@ def _build_corrections_table(corrections: list, styles, available_width_mm: floa
     scaled_cw = _scale_col_widths(cw, available_width_mm - 4)  # slightly tighter
     t = Table(rows, colWidths=[c * mm for c in scaled_cw], repeatRows=1)
 
+=======
+            Paragraph(c.get("band",""), row_style),
+            Paragraph(str(c.get("label","")).split(".")[0], row_style),
+            Paragraph(str(c.get("freq_mhz","")), row_style),
+            Paragraph(c.get("modulation",""), row_style),
+            Paragraph(c.get("bandwidth",""), row_style),
+            Paragraph(c.get("antenna",""), row_style),
+            Paragraph(f"{c.get('origin_measured_dbm',0):.2f}", row_style),
+            Paragraph(f"{c.get('dut_measured_dbm',0):.2f}", row_style),
+            Paragraph(f"{c.get('delta_dbm',0):+.3f}", row_style),
+            Paragraph(f"{c.get('correction_dbm',0):+.3f}", cor_style),
+        ])
+
+    cw = [28, 20, 30, 32, 26, 22, 38, 38, 36, 50]
+    t = Table(rows, colWidths=[c*mm for c in cw], repeatRows=1)
+>>>>>>> origin/main
     t.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,0),  C_HEADER_BG),
         ("ROWBACKGROUNDS",(0,1), (-1,-1), [colors.HexColor("#FFF8EC"), colors.HexColor("#FFF3D6")]),
@@ -443,4 +578,8 @@ def _build_corrections_table(corrections: list, styles, available_width_mm: floa
         ("TOPPADDING",    (0,0), (-1,-1), 3),
         ("BOTTOMPADDING", (0,0), (-1,-1), 3),
     ]))
+<<<<<<< HEAD
     return [t]
+=======
+    return [t]
+>>>>>>> origin/main

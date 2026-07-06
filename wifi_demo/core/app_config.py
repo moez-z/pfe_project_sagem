@@ -9,6 +9,7 @@ Config file: <project_root>/app_config.json
 
 import json
 import os
+<<<<<<< HEAD
 import sys
 from pathlib import Path
 
@@ -26,6 +27,11 @@ def _get_base_dir() -> Path:
 
 
 _CONFIG_PATH = _get_base_dir() / "app_config.json"
+=======
+from pathlib import Path
+
+_CONFIG_PATH = Path(__file__).parent.parent / "app_config.json"
+>>>>>>> origin/main
 
 _DEFAULTS = {
     "post_number":   None,   # int 1-10, set on first launch

@@ -41,8 +41,11 @@ _RE_CONF2 = re.compile(r'\[(\d{2}:\d{2}:\d{2}:\d{3})\]\s*={3,}>\s*(.*?)\s*<={3,}
 #   SN_<serial>_ATR_TEST_...
 _RE_SN_FILENAME = re.compile(r'SN_([A-Z0-9]+)_ATR_TEST')
 
+<<<<<<< HEAD
 _RE_POWER_RMS_AVG = re.compile(r'^POWER_(?:DBM_)?RMS_AVG_\w+$')
 
+=======
+>>>>>>> origin/main
 
 # ---------------------------------------------------------------------------
 # LogParser
@@ -149,6 +152,7 @@ class LogParser:
         block_num: int = 0
         block_type: Optional[BlockType] = None
 
+<<<<<<< HEAD
         def _is_skipped(header: str, lines: list[str]) -> bool:
             if "[Skipped]" in header:
                 return True
@@ -157,27 +161,35 @@ class LogParser:
                 for ln in lines
             )
 
+=======
+>>>>>>> origin/main
         def flush():
             if block_type == BlockType.TX_VERIFY:
                 blk = LogParser._parse_tx_block(block_num, block_header, block_lines)
                 if blk:
                     result.tx_blocks.append(blk)
+<<<<<<< HEAD
                 elif _is_skipped(block_header, block_lines):
                     result.skipped_tx_blocks.append((block_num, block_header))
                 else:
                     result.rejected_tx_blocks.append(
                         (block_num, block_header, "missing/null POWER_DBM_RMS_AVG_S1")
                     )
+=======
+>>>>>>> origin/main
             elif block_type == BlockType.RX_VERIFY:
                 blk = LogParser._parse_rx_block(block_num, block_header, block_lines)
                 if blk:
                     result.rx_blocks.append(blk)
+<<<<<<< HEAD
                 elif _is_skipped(block_header, block_lines):
                     result.skipped_rx_blocks.append((block_num, block_header))
                 else:
                     result.rejected_rx_blocks.append(
                         (block_num, block_header, "missing/null PER and RSSI_RX1")
                     )
+=======
+>>>>>>> origin/main
 
         for raw_line in lines:
             stripped = raw_line.strip()
@@ -209,6 +221,7 @@ class LogParser:
     # TX block parser
     # -----------------------------------------------------------------------
 
+<<<<<<< HEAD
 
     @staticmethod
     def _parse_tx_block(num: int, header: str, lines: list[str]) -> Optional[TxBlock]:
@@ -218,10 +231,19 @@ class LogParser:
             if s == "Skipped" or "[Skipped]" in s:
                 return None  # caller records as skipped block
 
+=======
+    @staticmethod
+    def _parse_tx_block(num: int, header: str, lines: list[str]) -> Optional[TxBlock]:
+>>>>>>> origin/main
         blk = TxBlock(block_number=num, raw_header=header)
 
         # --- Parse header tokens ---
         tokens = header.split()
+<<<<<<< HEAD
+=======
+        # Tokens after "TX_VERIFY EVM MASK POWER SPECTRUM":
+        # e.g.: 5500  OFDM-6  NON_HT  BW-20  ANT1
+>>>>>>> origin/main
         for tok in tokens:
             if re.match(r'^\d{4,5}$', tok):
                 blk.freq_mhz = int(tok)
@@ -237,6 +259,7 @@ class LogParser:
         if blk.freq_mhz:
             try:
                 blk.band = Band.from_freq(blk.freq_mhz)
+<<<<<<< HEAD
             except ValueError:
                 pass
 
@@ -250,6 +273,14 @@ class LogParser:
         #
         tx_power_seen = 0
         power_candidates: list[tuple[float, Optional[float], Optional[float], int]] = []
+=======
+            except ValueError as e:
+                pass
+
+        # --- Parse fields ---
+        # We need the FIRST occurrence of TX_POWER_DBM (the target, not the result)
+        tx_power_seen = 0
+>>>>>>> origin/main
 
         for line in lines:
             line = line.strip()
@@ -270,6 +301,7 @@ class LogParser:
 
             if key == 'TX_POWER_DBM':
                 tx_power_seen += 1
+<<<<<<< HEAD
                 if tx_power_seen == 1:          # first occurrence = target
                     blk.tx_target_dbm = value
 
@@ -284,6 +316,15 @@ class LogParser:
                 # 'PRE' fields (POWER_PRE_AVG_VSA1) are pre-correction snapshots
                 # — never the true measured power — so we skip them explicitly.
                 power_candidates.append((value, lo, hi, 2))
+=======
+                if tx_power_seen == 1:          # First = target (no limits yet)
+                    blk.tx_target_dbm = value
+
+            elif key == 'POWER_DBM_RMS_AVG_S1':
+                blk.tx_measured_dbm = value
+                blk.tx_limit_lo = lo
+                blk.tx_limit_hi = hi
+>>>>>>> origin/main
 
             elif key == 'POWER_DBM_RMS_MAX_S1':
                 blk.power_rms_max = value
@@ -297,6 +338,7 @@ class LogParser:
             elif key == 'FREQ_ERROR_AVG':
                 blk.freq_error_avg_ppm = value
 
+<<<<<<< HEAD
         # --- Select the best power candidate ---
         if power_candidates:
             # Prefer any candidate that carries hard limits (lo or hi present)
@@ -310,6 +352,8 @@ class LogParser:
             blk.tx_limit_lo     = best[1]
             blk.tx_limit_hi     = best[2]
 
+=======
+>>>>>>> origin/main
         # Only return block if we got the key measurement
         if blk.tx_measured_dbm is None:
             return None
@@ -321,12 +365,15 @@ class LogParser:
 
     @staticmethod
     def _parse_rx_block(num: int, header: str, lines: list[str]) -> Optional[RxBlock]:
+<<<<<<< HEAD
         # --- Detect explicit "Skipped" marker from the test station ---
         for line in lines:
             s = line.strip()
             if s == "Skipped" or "[Skipped]" in s:
                 return None  # caller records this as a skipped block, not null data
 
+=======
+>>>>>>> origin/main
         blk = RxBlock(block_number=num, raw_header=header)
 
         # --- Parse header tokens ---
@@ -420,4 +467,8 @@ class LogParser:
         try:
             return float(s)
         except (ValueError, TypeError):
+<<<<<<< HEAD
             return None
+=======
+            return None
+>>>>>>> origin/main

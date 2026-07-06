@@ -56,15 +56,21 @@ class RxPage(QWidget):
         self._export_btn.setEnabled(False)
         self._export_btn.clicked.connect(self._export_csv)
 
+<<<<<<< HEAD
         self._refresh_btn = QPushButton("⟲  Refresh")
         self._refresh_btn.clicked.connect(self.refresh)
 
+=======
+>>>>>>> origin/main
         filter_row.addWidget(band_lbl)
         filter_row.addWidget(self._band_combo)
         filter_row.addWidget(status_lbl)
         filter_row.addWidget(self._status_combo)
         filter_row.addStretch()
+<<<<<<< HEAD
         filter_row.addWidget(self._refresh_btn)
+=======
+>>>>>>> origin/main
         filter_row.addWidget(self._export_btn)
         root.addLayout(filter_row)
 
@@ -117,10 +123,13 @@ class RxPage(QWidget):
         self._apply_filter()
         self._export_btn.setEnabled(bool(results))
 
+<<<<<<< HEAD
     def refresh(self):
         """Re-apply current filters and redraw the table from the last loaded results."""
         self._apply_filter()
 
+=======
+>>>>>>> origin/main
     # ── Private ───────────────────────────────────────────────────────────────
 
     def _apply_filter(self):

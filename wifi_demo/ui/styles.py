@@ -1,6 +1,7 @@
 """
 styles.py — Global QSS stylesheet with dark/light theme support.
 """
+<<<<<<< HEAD
 import json, os, sys
 from pathlib import Path
 
@@ -11,6 +12,12 @@ else:
     _BASE_DIR = Path(__file__).resolve().parent.parent
 
 _PREFS_FILE = str(_BASE_DIR / "app_config.json")
+=======
+import json, os
+
+# ── Theme persistence ─────────────────────────────────────────────────────────
+_PREFS_FILE = os.path.join(os.path.dirname(__file__), "..", "app_config.json")
+>>>>>>> origin/main
 _DARK_MODE  = True  # default
 
 def load_theme_pref():

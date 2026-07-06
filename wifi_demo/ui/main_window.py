@@ -23,9 +23,14 @@ from ui.pages.path_loss_page    import PathLossPage
 
 
 class _CalibrationWorker(QObject):
+<<<<<<< HEAD
     finished         = pyqtSignal(object)
     error            = pyqtSignal(str)
     validation_error = pyqtSignal(str)
+=======
+    finished = pyqtSignal(object)
+    error    = pyqtSignal(str)
+>>>>>>> origin/main
 
     def __init__(self, origin_path, dut_path, tolerance):
         super().__init__()
@@ -36,6 +41,7 @@ class _CalibrationWorker(QObject):
     def run(self):
         try:
             from core import LogParser, CalibrationEngine
+<<<<<<< HEAD
             from core.log_validator import LogValidator, LogValidationError
 
             origin = LogParser.parse(self.origin_path)
@@ -48,6 +54,10 @@ class _CalibrationWorker(QObject):
                 self.validation_error.emit(str(ve))
                 return
 
+=======
+            origin = LogParser.parse(self.origin_path)
+            dut    = LogParser.parse(self.dut_path)
+>>>>>>> origin/main
             self.finished.emit(CalibrationEngine.compare(origin, dut, self.tolerance))
         except Exception as e:
             import traceback
@@ -130,6 +140,7 @@ class MainWindow(QMainWindow):
             self._corr_page.set_path_loss_file
         )
 
+<<<<<<< HEAD
         # ── Path-loss <-> Corrections cross-page sync ───────────────────────
         # When a path_loss.csv is loaded directly from the Corrections page,
         # mirror it into the dedicated Path-Loss viewer automatically.
@@ -143,6 +154,8 @@ class MainWindow(QMainWindow):
             lambda _correction: self._path_loss_page.reload_from_disk()
         )
 
+=======
+>>>>>>> origin/main
         # ── Status bar ───────────────────────────────────────────────────────
         self._status_bar = QStatusBar()
         self.setStatusBar(self._status_bar)
@@ -165,7 +178,11 @@ class MainWindow(QMainWindow):
         logo.setObjectName("logo_label")
         lay.addWidget(logo)
 
+<<<<<<< HEAD
         self._product_lbl = QLabel("—")
+=======
+        
+>>>>>>> origin/main
         self._product_lbl.setObjectName("product_label")
         lay.addWidget(self._product_lbl)
 
@@ -233,6 +250,7 @@ class MainWindow(QMainWindow):
         self._pdf_btn.clicked.connect(self._export_pdf)
         self._pdf_btn.setFixedHeight(38)
         lay.addWidget(self._pdf_btn)
+<<<<<<< HEAD
 
         self._excel_btn = QPushButton("  📊  Export Excel")
         self._excel_btn.setObjectName("nav_btn")
@@ -240,6 +258,8 @@ class MainWindow(QMainWindow):
         self._excel_btn.clicked.connect(self._export_excel)
         self._excel_btn.setFixedHeight(38)
         lay.addWidget(self._excel_btn)
+=======
+>>>>>>> origin/main
         lay.addSpacing(10)
 
         # ── Logout button ─────────────────────────────────────────────────────────
@@ -354,10 +374,15 @@ class MainWindow(QMainWindow):
         self._thread.started.connect(self._worker.run)
         self._worker.finished.connect(self._on_done)
         self._worker.error.connect(self._on_error)
+<<<<<<< HEAD
         self._worker.validation_error.connect(self._on_validation_error)
         self._worker.finished.connect(self._thread.quit)
         self._worker.error.connect(self._thread.quit)
         self._worker.validation_error.connect(self._thread.quit)
+=======
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.error.connect(self._thread.quit)
+>>>>>>> origin/main
         self._thread.start()
 
     def _on_done(self, report):
@@ -383,10 +408,13 @@ class MainWindow(QMainWindow):
         if pl_path:
             self._corr_page.set_path_loss_file(pl_path)
 
+<<<<<<< HEAD
         # Enable export buttons
         self._pdf_btn.setEnabled(True)
         self._excel_btn.setEnabled(True)
 
+=======
+>>>>>>> origin/main
        # ── Persist via API ───────────────────────────────────────────────
         session_id = None
         if self._api_url:
@@ -459,6 +487,7 @@ class MainWindow(QMainWindow):
         self._status_bar.showMessage(f"✗  {msg.splitlines()[0]}")
         self._dash_page._console.setPlainText(f"ERROR:\n{msg}")
 
+<<<<<<< HEAD
     def _on_validation_error(self, msg):
         self._update_badge("fail", "INVALID LOGS")
         self._status_bar.showMessage("✗  Log validation failed — calibration was not run.")
@@ -470,6 +499,8 @@ class MainWindow(QMainWindow):
             msg
         )
 
+=======
+>>>>>>> origin/main
     def _export_pdf(self):
         if not self._report:
             return
@@ -489,6 +520,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Export failed", str(e))
 
+<<<<<<< HEAD
     def _export_excel(self):
         if not self._report:
             return
@@ -510,6 +542,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Export failed", str(e))
 
+=======
+>>>>>>> origin/main
     def _on_logout(self):
         from PyQt6.QtWidgets import QMessageBox
         reply = QMessageBox.question(
